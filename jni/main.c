@@ -37,7 +37,7 @@ void dump_memory_region(FILE* pMemFile, unsigned long start_address, long length
 }
 
 /**
- * if net == true. 
+ * if net == true.
  *   ip_addr:port is used;
  */
 struct Option {
@@ -47,6 +47,11 @@ struct Option {
     int port;
 } opt;
 
+struct Sock {
+    int fd;
+} sock;
+
+int open_socket(struct Sock *sock, struct Option *opt);
 
 int main(int argc, char **argv)
 {
@@ -69,66 +74,68 @@ int main(int argc, char **argv)
     }
 
     // ptrace attach
-    
-        int pid = opt.pid;
-        long ptraceResult = ptrace(PTRACE_ATTACH, pid, NULL, NULL);
-        if (ptraceResult < 0)
-        {
-            printf("Unable to attach to the pid specified\n");
-            return -1;
-        }
-        wait(NULL);
 
-        char mapsFilename[1024];
-        sprintf(mapsFilename, "/proc/%d/maps", opt.pid);
-        FILE* pMapsFile = fopen(mapsFilename, "r");
-        char memFilename[1024];
-        sprintf(memFilename, "/proc/%d/mem", opt.pid);
-        FILE* pMemFile = fopen(memFilename, "r");
+    int pid = opt.pid;
+    long ptraceResult = ptrace(PTRACE_ATTACH, pid, NULL, NULL);
+    if (ptraceResult < 0)
+    {
+        printf("Unable to attach to the pid specified\n");
+        return -1;
+    }
+    wait(NULL);
 
+    char mapsFilename[1024];
+    sprintf(mapsFilename, "/proc/%d/maps", opt.pid);
+    FILE *pMapsFile = fopen(mapsFilename, "r");
+    char memFilename[1024];
+    sprintf(memFilename, "/proc/%d/mem", opt.pid);
+    FILE *pMemFile = fopen(memFilename, "r");
 
-        int serverSocket = -1;
-        if (opt.net) {
-            serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-            if (serverSocket == -1)
-            {
-                printf("Could not create socket\n");
-                return -1;
-            }
-            struct sockaddr_in serverSocketAddress;
-            serverSocketAddress.sin_addr.s_addr = inet_addr(opt.ip_addr);
-            serverSocketAddress.sin_family = AF_INET;
-            serverSocketAddress.sin_port = htons(opt.port);
-            if (connect(serverSocket, (struct sockaddr *) &serverSocketAddress,
-                        sizeof(serverSocketAddress)) < 0)
-            {
-                printf("Could not connect to server\n");
-                return -1;
-            }
-        }
+    sock.fd = -1;
+    if (opt.net)
+        open_socket(&sock, &opt);
 
+    char line[256];
+    while (fgets(line, 256, pMapsFile) != NULL)
+    {
+        unsigned long start_address;
+        unsigned long end_address;
+        sscanf(line, "%08lx-%08lx\n", &start_address, &end_address);
+        fprintf(stderr, "%s\n", line);
+        // dump_memory_region(pMemFile, start_address, end_address - start_address, sock.fd);
+    }
 
-        char line[256];
-        while (fgets(line, 256, pMapsFile) != NULL)
-        {
-            unsigned long start_address;
-            unsigned long end_address;
-            sscanf(line, "%08lx-%08lx\n", &start_address, &end_address);
-            dump_memory_region(pMemFile, start_address, end_address - start_address, serverSocket);
-        }
+    fclose(pMapsFile);
+    fclose(pMemFile);
 
+    if (sock.fd != -1)
+    {
+        close(sock.fd);
+    }
 
-        fclose(pMapsFile);
-        fclose(pMemFile);
-
-        if (serverSocket != -1)
-        {
-            close(serverSocket);
-        }
-
-        ptrace(PTRACE_CONT, pid, NULL, NULL);
-        ptrace(PTRACE_DETACH, pid, NULL, NULL);
+    ptrace(PTRACE_CONT, pid, NULL, NULL);
+    ptrace(PTRACE_DETACH, pid, NULL, NULL);
 }
 
 
-
+/// set sock->fd;
+int open_socket(struct Sock *sock, struct Option *opt) {
+    int serverSocket = -1;
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket == -1)
+    {
+        fprintf(stderr, "Could not create socket\n");
+        return -1;
+    }
+    struct sockaddr_in serverSocketAddress;
+    serverSocketAddress.sin_addr.s_addr = inet_addr(opt->ip_addr);
+    serverSocketAddress.sin_family = AF_INET;
+    serverSocketAddress.sin_port = htons(opt->port);
+    if (connect(serverSocket, (struct sockaddr *)&serverSocketAddress,
+                sizeof(serverSocketAddress)) < 0)
+    {
+        fprintf(stderr, "Could not connect to server\n");
+        return -1;
+    }
+    sock->fd = serverSocket;
+}

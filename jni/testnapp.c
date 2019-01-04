@@ -1,13 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
+
+// print to stderr, or you cannot see it with adb shell
 
 int main() {
     for (int i = 0; i < 100; i ++) {
-        fprintf(stderr, "test native app is running\n");
-        fprintf(stdout, "test native app is running\n");
-        printf("test native app is running\n");
-        printf("test native app is running\n");
+        fprintf(stderr, "pid = %d, test native app is running\n", getpid());
         sleep(1);
     }
     return 0;
