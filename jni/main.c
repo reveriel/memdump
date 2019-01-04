@@ -63,27 +63,15 @@ int main(int argc, char **argv)
 
     struct Process *p = proc_init(&opt);
 
-    // ptrace attach
-    int pid = opt.pid;
-
     if (proc_attach(p)) {
         proc_del(p);
         return -1;
     }
 
-    // sock.fd = -1;
-    // if (opt.net)
-    //     open_socket(&sock, &opt);
-
     proc_do(p);
     proc_print_maps(p);
 
     proc_del(p);
-
-    // if (sock.fd != -1)
-    // {
-    //     close(sock.fd);
-    // }
 
     proc_detach(p);
     return 0;
