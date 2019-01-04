@@ -4,6 +4,15 @@
 #include <sys/ptrace.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <stdbool.h>
+
+struct Process {
+    int pid;
+    int ppid;
+    char *name;
+    /* struct *Mem; */
+};
+
 
 void dump_memory_region(FILE* pMemFile, unsigned long start_address, long length, int serverSocket)
 {
@@ -27,11 +36,41 @@ void dump_memory_region(FILE* pMemFile, unsigned long start_address, long length
     }
 }
 
-int main(int argc, char **argv) {
+/**
+ * if net == true. 
+ *   ip_addr:port is used;
+ */
+struct Option {
+    int pid;
+    bool net;
+    char *ip_addr;
+    int port;
+} opt;
 
-    if (argc == 2 || argc == 4)
-    {
-        int pid = atoi(argv[1]);
+
+int main(int argc, char **argv)
+{
+    if (argc == 2) {
+        opt.net = false;
+        opt.pid = atoi(argv[1]);
+    } else if (argc == 4) {
+        opt.net = true;
+        opt.pid = atoi(argv[1]);
+        opt.ip_addr = argv[2];
+        int count = sscanf(argv[3], "%d", &opt.port);
+        if (count == 0) {
+            printf("Invalid port specified\n");
+            return -1;
+        }
+    } else {
+        printf("%s <pid>\n", argv[0]);
+        printf("%s <pid> <ip-address> <port>\n", argv[0]);
+        exit(0);
+    }
+
+    // ptrace attach
+    
+        int pid = opt.pid;
         long ptraceResult = ptrace(PTRACE_ATTACH, pid, NULL, NULL);
         if (ptraceResult < 0)
         {
@@ -41,21 +80,15 @@ int main(int argc, char **argv) {
         wait(NULL);
 
         char mapsFilename[1024];
-        sprintf(mapsFilename, "/proc/%s/maps", argv[1]);
+        sprintf(mapsFilename, "/proc/%d/maps", opt.pid);
         FILE* pMapsFile = fopen(mapsFilename, "r");
         char memFilename[1024];
-        sprintf(memFilename, "/proc/%s/mem", argv[1]);
+        sprintf(memFilename, "/proc/%d/mem", opt.pid);
         FILE* pMemFile = fopen(memFilename, "r");
+
+
         int serverSocket = -1;
-        if (argc == 4)
-        {   
-            unsigned int port;
-            int count = sscanf(argv[3], "%d", &port);
-            if (count == 0)
-            {
-                printf("Invalid port specified\n");
-                return -1;
-            }
+        if (opt.net) {
             serverSocket = socket(AF_INET, SOCK_STREAM, 0);
             if (serverSocket == -1)
             {
@@ -63,15 +96,18 @@ int main(int argc, char **argv) {
                 return -1;
             }
             struct sockaddr_in serverSocketAddress;
-            serverSocketAddress.sin_addr.s_addr = inet_addr(argv[2]);
+            serverSocketAddress.sin_addr.s_addr = inet_addr(opt.ip_addr);
             serverSocketAddress.sin_family = AF_INET;
-            serverSocketAddress.sin_port = htons(port);
-            if (connect(serverSocket, (struct sockaddr *) &serverSocketAddress, sizeof(serverSocketAddress)) < 0)
+            serverSocketAddress.sin_port = htons(opt.port);
+            if (connect(serverSocket, (struct sockaddr *) &serverSocketAddress,
+                        sizeof(serverSocketAddress)) < 0)
             {
                 printf("Could not connect to server\n");
                 return -1;
             }
         }
+
+
         char line[256];
         while (fgets(line, 256, pMapsFile) != NULL)
         {
@@ -80,8 +116,11 @@ int main(int argc, char **argv) {
             sscanf(line, "%08lx-%08lx\n", &start_address, &end_address);
             dump_memory_region(pMemFile, start_address, end_address - start_address, serverSocket);
         }
+
+
         fclose(pMapsFile);
         fclose(pMemFile);
+
         if (serverSocket != -1)
         {
             close(serverSocket);
@@ -89,11 +128,7 @@ int main(int argc, char **argv) {
 
         ptrace(PTRACE_CONT, pid, NULL, NULL);
         ptrace(PTRACE_DETACH, pid, NULL, NULL);
-    }
-    else
-    {
-        printf("%s <pid>\n", argv[0]);
-        printf("%s <pid> <ip-address> <port>\n", argv[0]);
-        exit(0);
-    }
 }
+
+
+
