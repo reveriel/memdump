@@ -26,6 +26,10 @@ struct MemReg {
     struct Page *pages;
 };
 
+struct Page {
+    uint32_t hash;
+};
+
 
 struct Process *proc_init(struct Option *opt) {
     struct Process *p = (struct Process *)malloc(sizeof(struct Process));
@@ -50,6 +54,41 @@ void proc_del(struct Process *p) {
     free(p->maps);
 }
 
+// 'line' is one line from /proc/<pid>/maps
+// parse 'line', save it to 'm'
+static void parse_maps_line(char *line, struct MemReg* m) {
+    unsigned long start_address;
+    unsigned long end_address;
+    char perms[5];
+    int offset;
+    char dev[8]; // some has value '2d' which is wired;
+    int inode;
+    char path[256];
+    memset(path, 0, 256);
+    memset(dev, 0, 8);
+
+    // format: addr-addr perms offset major:minor inode path
+    int ret = sscanf(line, "%lx-%lx %s %x %s %d %[^\n]\n",
+                    &start_address, &end_address,
+                    perms, &offset, dev, &inode, path);
+    if (ret != 7 && ret != 6) {
+        fprintf(stderr, "ret = %d\n", ret);
+        fprintf(stderr, "%s: sscanf failed\n", __func__);
+        // check by human, if correct
+        fprintf(stderr, "%lx-%lx %s %x %s %d %s\n",
+                        start_address, end_address,
+                        perms, offset, dev, inode, path);
+        fprintf(stderr, "%s\n", line);
+        return;
+    }
+
+    m->start = start_address;
+    m->end = end_address;
+    if (strlen(path) != 0) {
+        m->pathname = strdup(path);
+    }
+}
+
 void proc_do(struct Process *p) {
     p->maps_size = 0;
     p->maps_cap = 4;
@@ -62,40 +101,34 @@ void proc_do(struct Process *p) {
             p->maps_cap *= 2;
             p->maps = (struct MemReg*)realloc(p->maps, p->maps_cap * sizeof(struct MemReg));
         }
-        unsigned long start_address;
-        unsigned long end_address;
-        char perms[5];
-        int offset;
-        char dev[8]; // some has value '2d' which is wired;
-        int inode;
-        char path[256];
-        memset(path, 0, 256);
-        memset(dev, 0, 8);
-
-        // format: addr-addr perms offset major:minor inode path
-        int ret = sscanf(line, "%lx-%lx %s %x %s %d %[^\n]\n",
-                        &start_address, &end_address,
-                        perms, &offset, dev, &inode, path);
-        if (ret != 7 && ret != 6) {
-            fprintf(stderr, "ret = %d\n", ret);
-            fprintf(stderr, "%s: sscanf failed\n", __func__);
-            // check by human, if correct
-            fprintf(stderr, "%lx-%lx %s %x %s %d %s\n",
-                            start_address, end_address,
-                            perms, offset, dev, inode, path);
-            fprintf(stderr, "%s\n", line);
-            continue;
-        }
-        p->maps[p->maps_size].start = start_address;
-        p->maps[p->maps_size].end = end_address;
-        if (strlen(path) != 0) {
-            p->maps[p->maps_size].pathname = strdup(path);
-        }
-
-        // dump_memory_region(pMemFile, start_address, end_address - start_address, sock.fd);
+        parse_maps_line(line, &p->maps[p->maps_size]);
         p->maps_size++;
     }
 }
+
+// dump_memory_region(pMemFile, start_address, end_address - start_address, sock.fd);
+void dump_memory_region_send(FILE* pMemFile, unsigned long start_address, long length, int serverSocket)
+{
+    unsigned long address;
+    int pageLength = 4096;
+    unsigned char page[pageLength];
+    fseeko(pMemFile, start_address, SEEK_SET);
+
+    for (address=start_address; address < start_address + length; address += pageLength)
+    {
+        fread(&page, 1, pageLength, pMemFile);
+        if (serverSocket == -1)
+        {
+            // write to stdout
+            fwrite(&page, 1, pageLength, stdout);
+        }
+        else
+        {
+            send(serverSocket, &page, pageLength, 0);
+        }
+    }
+}
+
 
 void proc_print_maps(struct Process *p) {
     for (int i = 0; i < p->maps_size; i++) {
@@ -104,6 +137,7 @@ void proc_print_maps(struct Process *p) {
     }
 }
 
+// attach to 'p', also wait until 'p' stops.
 int proc_attach(struct Process *p) {
     long ptraceResult = ptrace(PTRACE_ATTACH, p->pid, NULL, NULL);
     if (ptraceResult < 0) {

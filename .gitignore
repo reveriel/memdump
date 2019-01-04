@@ -1,4 +1,5 @@
 
+.vscode/
 obj/
 libs/
 *.out
