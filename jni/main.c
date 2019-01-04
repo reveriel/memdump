@@ -3,15 +3,13 @@
 #include <limits.h>
 #include <sys/ptrace.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <arpa/inet.h>
 #include <stdbool.h>
 
-struct Process {
-    int pid;
-    int ppid;
-    char *name;
-    /* struct *Mem; */
-};
+#include "mem.h"
+#include "opt.h"
 
 
 void dump_memory_region(FILE* pMemFile, unsigned long start_address, long length, int serverSocket)
@@ -36,16 +34,7 @@ void dump_memory_region(FILE* pMemFile, unsigned long start_address, long length
     }
 }
 
-/**
- * if net == true.
- *   ip_addr:port is used;
- */
-struct Option {
-    int pid;
-    bool net;
-    char *ip_addr;
-    int port;
-} opt;
+struct Option opt;
 
 struct Sock {
     int fd;
@@ -73,8 +62,9 @@ int main(int argc, char **argv)
         exit(0);
     }
 
-    // ptrace attach
+    struct Process *p = proc_init(&opt);
 
+    // ptrace attach
     int pid = opt.pid;
     long ptraceResult = ptrace(PTRACE_ATTACH, pid, NULL, NULL);
     if (ptraceResult < 0)
@@ -84,29 +74,13 @@ int main(int argc, char **argv)
     }
     wait(NULL);
 
-    char mapsFilename[1024];
-    sprintf(mapsFilename, "/proc/%d/maps", opt.pid);
-    FILE *pMapsFile = fopen(mapsFilename, "r");
-    char memFilename[1024];
-    sprintf(memFilename, "/proc/%d/mem", opt.pid);
-    FILE *pMemFile = fopen(memFilename, "r");
-
     sock.fd = -1;
     if (opt.net)
         open_socket(&sock, &opt);
 
-    char line[256];
-    while (fgets(line, 256, pMapsFile) != NULL)
-    {
-        unsigned long start_address;
-        unsigned long end_address;
-        sscanf(line, "%08lx-%08lx\n", &start_address, &end_address);
-        fprintf(stderr, "%s\n", line);
-        // dump_memory_region(pMemFile, start_address, end_address - start_address, sock.fd);
-    }
+    proc_do(p);
 
-    fclose(pMapsFile);
-    fclose(pMemFile);
+    proc_del(p);
 
     if (sock.fd != -1)
     {
@@ -115,6 +89,7 @@ int main(int argc, char **argv)
 
     ptrace(PTRACE_CONT, pid, NULL, NULL);
     ptrace(PTRACE_DETACH, pid, NULL, NULL);
+    return 0;
 }
 
 
@@ -138,4 +113,5 @@ int open_socket(struct Sock *sock, struct Option *opt) {
         return -1;
     }
     sock->fd = serverSocket;
+    return 0;
 }
