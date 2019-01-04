@@ -13,6 +13,8 @@ struct Page;
 struct Process *proc_init(struct Option *opt);
 void proc_del(struct Process *p);
 void proc_do(struct Process *p);
-
+void proc_print_maps(struct Process *p);
+int proc_attach(struct Process *p);
+void proc_detach(struct Process *p);
 
 #endif

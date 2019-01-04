@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
-#include <sys/ptrace.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -66,29 +65,27 @@ int main(int argc, char **argv)
 
     // ptrace attach
     int pid = opt.pid;
-    long ptraceResult = ptrace(PTRACE_ATTACH, pid, NULL, NULL);
-    if (ptraceResult < 0)
-    {
-        printf("Unable to attach to the pid specified\n");
+
+    if (proc_attach(p)) {
+        proc_del(p);
         return -1;
     }
-    wait(NULL);
 
-    sock.fd = -1;
-    if (opt.net)
-        open_socket(&sock, &opt);
+    // sock.fd = -1;
+    // if (opt.net)
+    //     open_socket(&sock, &opt);
 
     proc_do(p);
+    proc_print_maps(p);
 
     proc_del(p);
 
-    if (sock.fd != -1)
-    {
-        close(sock.fd);
-    }
+    // if (sock.fd != -1)
+    // {
+    //     close(sock.fd);
+    // }
 
-    ptrace(PTRACE_CONT, pid, NULL, NULL);
-    ptrace(PTRACE_DETACH, pid, NULL, NULL);
+    proc_detach(p);
     return 0;
 }
 
