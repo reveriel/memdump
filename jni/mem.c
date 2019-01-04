@@ -30,6 +30,7 @@ struct Page {
     uint32_t hash;
 };
 
+const size_t pageSize = 4096;
 
 struct Process *proc_init(struct Option *opt) {
     struct Process *p = (struct Process *)malloc(sizeof(struct Process));
@@ -49,6 +50,7 @@ void proc_del(struct Process *p) {
     fclose(p->pMapsFile);
     fclose(p->pMemFile);
     for (int i = 0; i < p->maps_size; i++) {
+        free(p->maps[i].pages);
         free(p->maps[i].pathname);
     }
     free(p->maps);
@@ -89,6 +91,46 @@ static void parse_maps_line(char *line, struct MemReg* m) {
     }
 }
 
+static uint32_t page_hash(uint8_t *page, size_t length) {
+    size_t i = 0;
+    uint32_t hash = 0;
+    while (i != length) {
+        hash += page[i++];
+        hash += hash << 10;
+        hash ^= hash >> 6;
+    }
+    hash += hash << 3;
+    hash ^= hash >> 11;
+    hash += hash << 15;
+    return hash;
+}
+
+// read all pages in.. anonymous vma;
+static void read_mem(struct Process *p) {
+    uint8_t page[pageSize];
+
+    for (int i = 0; i < p->maps_size; i++) {
+        struct MemReg *m = &p->maps[i];
+        size_t numPages = (m->end - m->start) / pageSize + 1;
+        m->pages = (struct Page *)malloc(sizeof(struct Page) * numPages);
+
+        fseeko(p->pMemFile, m->start, SEEK_SET);
+        int j = 0;
+        for (unsigned long addr = m->start; addr < m->end; addr += pageSize) {
+            int ret = fread(page, 1, pageSize, p->pMemFile);
+            if (ret != pageSize) {
+                fprintf(stderr, "fread error\n");
+                continue;
+            }
+            m->pages[j++].hash = page_hash(page, pageSize);
+            if (j == numPages)  {
+                fprintf(stderr, "pages size too small\n");
+                break;
+            }
+        }
+    }
+}
+
 void proc_do(struct Process *p) {
     p->maps_size = 0;
     p->maps_cap = 4;
@@ -104,36 +146,29 @@ void proc_do(struct Process *p) {
         parse_maps_line(line, &p->maps[p->maps_size]);
         p->maps_size++;
     }
+
+    read_mem(p);
 }
-
-// dump_memory_region(pMemFile, start_address, end_address - start_address, sock.fd);
-void dump_memory_region_send(FILE* pMemFile, unsigned long start_address, long length, int serverSocket)
-{
-    unsigned long address;
-    int pageLength = 4096;
-    unsigned char page[pageLength];
-    fseeko(pMemFile, start_address, SEEK_SET);
-
-    for (address=start_address; address < start_address + length; address += pageLength)
-    {
-        fread(&page, 1, pageLength, pMemFile);
-        if (serverSocket == -1)
-        {
-            // write to stdout
-            fwrite(&page, 1, pageLength, stdout);
-        }
-        else
-        {
-            send(serverSocket, &page, pageLength, 0);
-        }
-    }
-}
-
 
 void proc_print_maps(struct Process *p) {
     for (int i = 0; i < p->maps_size; i++) {
-        fprintf(stderr, "%08lx-%08lx \t %s\n", p->maps[i].start, p->maps[i].end,
-                            p->maps[i].pathname);
+        struct MemReg *m = &p->maps[i];
+        fprintf(stderr, "%08lx-%08lx \t %s\n", m->start, m->end, m->pathname);
+    }
+}
+
+static void mem_print_pages(struct MemReg *m) {
+    int i = 0;
+    for (unsigned long addr = m->start; addr < m->end; addr += pageSize) {
+        fprintf(stderr, "  %012lx: %08x\n", addr, m->pages[i++].hash);
+    }
+}
+
+void proc_print_pages(struct Process *p) {
+    for (int i = 0; i < p->maps_size; i++) {
+        struct MemReg *m = &p->maps[i];
+        fprintf(stderr, "%012lx-%012lx \t %s\n", m->start, m->end, m->pathname);
+        mem_print_pages(m);
     }
 }
 

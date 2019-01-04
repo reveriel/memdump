@@ -39,6 +39,7 @@ int main(int argc, char **argv)
 
     proc_do(p);
     proc_print_maps(p);
+    proc_print_pages(p);
 
     proc_del(p);
 
