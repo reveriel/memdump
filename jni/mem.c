@@ -32,19 +32,37 @@ struct Page {
 
 const size_t pageSize = 4096;
 
-struct Process *proc_init(struct Option *opt) {
-    struct Process *p = (struct Process *)malloc(sizeof(struct Process));
-    p->pid = opt->pid;
-
+// return 0 on success
+static int open_files(struct Process *p) {
     char mapsFilename[1024];
     sprintf(mapsFilename, "/proc/%d/maps", p->pid);
     p->pMapsFile = fopen(mapsFilename, "r");
+    if (p->pMapsFile == NULL) {
+        fprintf(stderr, "fopen file: %s failed\n", mapsFilename);
+        return 1;
+    }
     char memFilename[1024];
     sprintf(memFilename, "/proc/%d/mem", p->pid);
     p->pMemFile = fopen(memFilename, "r");
+    if (p->pMapsFile == NULL) {
+        fprintf(stderr, "fopen file: %s failed\n", memFilename);
+        fclose(p->pMapsFile);
+        return 1;
+    }
+    return 0;
+}
 
+// return NULL if failed
+struct Process *proc_init(struct Option *opt) {
+    struct Process *p = (struct Process *)malloc(sizeof(struct Process));
+    p->pid = opt->pid;
+    if (open_files(p)) {
+        free(p);
+        return NULL;
+    }
     return p;
 }
+
 
 void proc_del(struct Process *p) {
     fclose(p->pMapsFile);
@@ -91,6 +109,7 @@ static void parse_maps_line(char *line, struct MemReg* m) {
     }
 }
 
+// https://en.wikipedia.org/wiki/Jenkins_hash_function
 static uint32_t page_hash(uint8_t *page, size_t length) {
     size_t i = 0;
     uint32_t hash = 0;
@@ -131,7 +150,34 @@ static void read_mem(struct Process *p) {
     }
 }
 
-void proc_do(struct Process *p) {
+
+static bool is_anon(struct MemReg *m) {
+    return !m->pathname || m->pathname[0] == '[';
+}
+
+// filter p->maps, filter out non-anonymous region
+static void filter_anon(struct Process *p) {
+    size_t anon_num = 0;
+    // decide new p->maps's size;
+    fprintf(stderr, "maps size = %d\n", p->maps_size);
+    for (int i = 0; i < p->maps_size; i++) {
+        struct MemReg *m = &p->maps[i];
+        if (is_anon(m)) {
+            anon_num++;
+        }
+    }
+    struct MemReg *anonM = (struct MemReg *)malloc(sizeof(struct MemReg) * anon_num);
+    int j = 0;
+    for (int i = 0; i < p->maps_size; i++) {
+        if (is_anon(&p->maps[i]))
+            anonM[j++] = p->maps[i];
+    }
+    free(p->maps);
+    p->maps_size = p->maps_cap = anon_num;
+    p->maps = anonM;
+}
+
+static void parse_maps(struct Process *p) {
     p->maps_size = 0;
     p->maps_cap = 4;
     p->maps = (struct MemReg*)malloc(p->maps_cap * sizeof(struct MemReg));
@@ -146,7 +192,11 @@ void proc_do(struct Process *p) {
         parse_maps_line(line, &p->maps[p->maps_size]);
         p->maps_size++;
     }
+}
 
+void proc_do(struct Process *p) {
+    parse_maps(p);
+    filter_anon(p);
     read_mem(p);
 }
 

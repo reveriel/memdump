@@ -31,6 +31,10 @@ int main(int argc, char **argv)
     }
 
     struct Process *p = proc_init(&opt);
+    if (!p) {
+        fprintf(stderr, "proc_init failed\n");
+        return 1;
+    }
 
     if (proc_attach(p)) {
         proc_del(p);
