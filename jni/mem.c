@@ -159,7 +159,7 @@ static bool is_anon(struct MemReg *m) {
 static void filter_anon(struct Process *p) {
     size_t anon_num = 0;
     // decide new p->maps's size;
-    fprintf(stderr, "maps size = %d\n", p->maps_size);
+    fprintf(stderr, "maps size = %zu\n", p->maps_size);
     for (int i = 0; i < p->maps_size; i++) {
         struct MemReg *m = &p->maps[i];
         if (is_anon(m)) {

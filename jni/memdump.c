@@ -1,3 +1,9 @@
+/** memdup
+ * dup a process's pages
+ *
+ * usage:
+ * memdump <pid>
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -44,6 +50,10 @@ int main(int argc, char **argv)
     proc_do(p);
     proc_print_maps(p);
     proc_print_pages(p);
+
+    // similarity of each pair of memory region
+    // given two process ...
+    // I'd use another programm to do that.
 
     proc_del(p);
 
