@@ -86,13 +86,33 @@ void set_print(struct Set *s) {
 
 /*
  jaccard index
-            A \cap B
+          |  A \cap B |
  =   ---------------------
-            A \cup B
+          |  A \cup B |
+
+    x = in a not in b
+    y = in a in b
+    z = in b not in a
+    return ( y ) / (x + y + z);
 */
 double set_jaccard(struct Set *a, struct Set *b) {
+    int x = 0, y = 0;
+    // for data in set 'a', search in set 'b';
+    for (struct rb_node *p = rb_first(&a->root); p; p = rb_next(p)) {
+        struct Data *data = rb_entry(p, struct Data, node);
+        if (set_in(b, data))
+            ++y;
+        else
+            ++x;
+    }
+    int z = 0;
+    for (struct rb_node *p = rb_first(&b->root); p; p = rb_next(p)) {
+         struct Data *data = rb_entry(p, struct Data, node);
+         if (!set_in(a, data))
+            ++z;
+    }
 
-    return 0.0;
+    return (double)y / (double)(x + y + z);
 }
 
 
