@@ -83,5 +83,15 @@ int main(int argc, char const *argv[])
     }
     printf("\n");
 
+    while (the_root.rb_node != NULL) {
+        rb_erase(the_root.rb_node, &the_root);
+    }
+
+    printf("after :\n");
+    for (struct rb_node* p = rb_first(&the_root); p; p = rb_next(p)) {
+        struct data *data = rb_entry(p, struct data, node);
+        printf("%d ", data->n);
+    }
+    printf("\n");
     return 0;
 }
