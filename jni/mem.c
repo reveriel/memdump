@@ -16,6 +16,9 @@ struct Process {
     size_t maps_cap;
     FILE *pMapsFile;
     FILE *pMemFile;
+    // some mem mem region has no name;
+    // give it an unique name "[<no_name_cnt>]"
+    int no_name_cnt;
 };
 
 struct MemReg {
@@ -56,6 +59,7 @@ static int open_files(struct Process *p) {
 struct Process *proc_init(int pid) {
     struct Process *p = (struct Process *)malloc(sizeof(struct Process));
     p->pid = pid;
+    p->no_name_cnt = 0;
     if (open_files(p)) {
         free(p);
         return NULL;
@@ -69,16 +73,18 @@ void proc_del(struct Process *p) {
         return;
     fclose(p->pMapsFile);
     fclose(p->pMemFile);
-    for (int i = 0; i < p->maps_size; i++) {
-        free(p->maps[i].pages);
-        free(p->maps[i].pathname);
+    for (int i = 0; i < p->maps_size - 1 ; i++) {
+        if (p->maps[i].pages)
+            free(p->maps[i].pages);
+        if (p->maps[i].pathname)
+            free(p->maps[i].pathname);
     }
     free(p->maps);
 }
 
 // 'line' is one line from /proc/<pid>/maps
 // parse 'line', save it to 'm'
-static void parse_maps_line(char *line, struct MemReg* m) {
+static void parse_maps_line(char *line, struct MemReg* m, struct Process *p) {
     unsigned long start_address;
     unsigned long end_address;
     char perms[5];
@@ -107,6 +113,9 @@ static void parse_maps_line(char *line, struct MemReg* m) {
     m->start = start_address;
     m->end = end_address;
     if (strlen(path) != 0) {
+        m->pathname = strdup(path);
+    } else {
+        sprintf(path, "[%d]", p->no_name_cnt++);
         m->pathname = strdup(path);
     }
 }
@@ -191,7 +200,7 @@ static void parse_maps(struct Process *p) {
             p->maps_cap *= 2;
             p->maps = (struct MemReg*)realloc(p->maps, p->maps_cap * sizeof(struct MemReg));
         }
-        parse_maps_line(line, &p->maps[p->maps_size]);
+        parse_maps_line(line, &p->maps[p->maps_size], p);
         p->maps_size++;
     }
 }

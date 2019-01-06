@@ -9,38 +9,77 @@
 #include "mem.h"
 #include "simi.h"
 
+// redunency
+struct Redund {
+    int comm;
+    struct MemReg *m1;
+    struct MemReg *m2;
+};
 
 // compute similiarity between two memory regions
-double simi_mrs(struct MemReg *m1, struct MemReg *m2) {
-    struct Set *s1 = set_init();
-    struct Set *s2 = set_init();
-    int n1 = mr_page_num(m1);
-    int n2 = mr_page_num(m2);
-    for (int i = 0; i < n1; i++) {
-        set_add(s1, data_init(page_to_u32(mr_get_page(m1, i))));
-    }
-    for (int i = 0; i < n2; i++) {
-        set_add(s2, data_init(page_to_u32(mr_get_page(m2, i))));
-    }
-    double simi = set_jaccard(s1, s2);
 
-    set_free(s1);
-    set_free(s2);
-    return simi;
+struct Set *build_set_from_mr(struct MemReg *m) {
+    struct Set *s =  set_init();
+    int n = mr_page_num(m);
+    for (int i = 0; i < n; i++) {
+        set_add(s, data_init(page_to_u32(mr_get_page(m, i))));
+    }
+    return s;
+}
+
+int comp_redunds(const void *a, const void *b) {
+    return ((struct Redund*)a)->comm - ((struct Redund *)b)->comm;
 }
 
 void print_simi(struct Process *p1, struct Process *p2) {
     int n1 = proc_mr_num(p1);
     int n2 = proc_mr_num(p2);
 
+    struct Set **sets1 = (struct Set **)malloc(sizeof(struct Set *) * n1);
+    struct Set **sets2 = (struct Set **)malloc(sizeof(struct Set *) * n2);
+
     for (int i = 0; i < n1; i++) {
-            struct MemReg *m1 = proc_get_mr(p1, i);
+        struct MemReg *m = proc_get_mr(p1, i);
+        sets1[i] = build_set_from_mr(m);
+    }
+    for (int i = 0; i < n2; i++) {
+        struct MemReg *m = proc_get_mr(p2, i);
+        sets2[i] = build_set_from_mr(m);
+    }
+
+    struct Redund *redunds = (struct Redund *)malloc(sizeof(struct Redund) * n1 * n2);
+    if (redunds == NULL) {
+        fprintf(stderr, "%s:%d, alloc failed\n", __func__, __LINE__);
+        goto out1;
+    }
+
+    for (int i = 0; i < n1; i++) {
         for (int j = 0; j < n2; j++) {
-            struct MemReg *m2 = proc_get_mr(p2, j);
-            double simi = simi_mrs(m1, m2);
-            fprintf(stderr, "%lf \t %s, %s\n", simi, mr_get_name(m1), mr_get_name(m2));
+            struct Redund *r = &redunds[i * n2 + j];
+            r->comm = set_common(sets1[i], sets2[j]);
+            r->m1 = proc_get_mr(p1, i);
+            r->m2 = proc_get_mr(p2, j);
+            // double simi = simi_mrs(m1, m2);
+            // fprintf(stderr, "%lf \t %s, %s\n", simi, mr_get_name(m1), mr_get_name(m2));
         }
     }
+
+    qsort(redunds, n1 * n2, sizeof(struct Redund), comp_redunds);
+
+    for (int i = 0, total = n1 * n2; i < total; i++) {
+        struct Redund *r = &redunds[i];
+        fprintf(stderr, "%d \t%s, %s\n", r->comm, mr_get_name(r->m1), mr_get_name(r->m2));
+    }
+
+    free(redunds);
+
+out1:
+    for (int i = 0; i < n1; i++)
+        set_free(sets1[i]);
+    for (int i = 0; i < n2; i++)
+        set_free(sets2[i]);
+    free(sets1);
+    free(sets2);
 }
 
 
