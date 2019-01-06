@@ -12,6 +12,15 @@ LOCAL_SRC_FILES := memdump.c mem.c
 
 include $(BUILD_EXECUTABLE)    # <-- Use this to build an executable.
 
+# cmp
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := cmp
+LOCAL_SRC_FILES := cmp.c mem.c simi.c rbtree.c
+# LOCAL_CPPFLAGS := -std=gnu++0x -Wall -fPIE         # whatever g++ flags you like
+# LOCAL_LDLIBS := -L$(SYSROOT)/usr/lib -llog -fPIE -pie   # whatever ld flags you like
+
+include $(BUILD_EXECUTABLE)    # <-- Use this to build an executable.
 
 # testnapp, used for testing memdump
 include $(CLEAR_VARS)

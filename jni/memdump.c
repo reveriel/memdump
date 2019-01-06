@@ -36,13 +36,14 @@ int main(int argc, char **argv)
         exit(0);
     }
 
-    struct Process *p = proc_init(&opt);
+    struct Process *p = proc_init(opt.pid);
     if (!p) {
         fprintf(stderr, "proc_init failed\n");
         return 1;
     }
 
     if (proc_attach(p)) {
+        fprintf(stderr, "proc_attach failed. exit\n");
         proc_del(p);
         return -1;
     }
@@ -55,9 +56,9 @@ int main(int argc, char **argv)
     // given two process ...
     // I'd use another programm to do that.
 
+    proc_detach(p);
     proc_del(p);
 
-    proc_detach(p);
     return 0;
 }
 

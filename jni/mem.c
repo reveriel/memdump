@@ -53,9 +53,9 @@ static int open_files(struct Process *p) {
 }
 
 // return NULL if failed
-struct Process *proc_init(struct Option *opt) {
+struct Process *proc_init(int pid) {
     struct Process *p = (struct Process *)malloc(sizeof(struct Process));
-    p->pid = opt->pid;
+    p->pid = pid;
     if (open_files(p)) {
         free(p);
         return NULL;
@@ -65,6 +65,8 @@ struct Process *proc_init(struct Option *opt) {
 
 
 void proc_del(struct Process *p) {
+    if (!p)
+        return;
     fclose(p->pMapsFile);
     fclose(p->pMemFile);
     for (int i = 0; i < p->maps_size; i++) {
@@ -159,7 +161,7 @@ static bool is_anon(struct MemReg *m) {
 static void filter_anon(struct Process *p) {
     size_t anon_num = 0;
     // decide new p->maps's size;
-    fprintf(stderr, "maps size = %zu\n", p->maps_size);
+    // fprintf(stderr, "maps size = %zu\n", p->maps_size);
     for (int i = 0; i < p->maps_size; i++) {
         struct MemReg *m = &p->maps[i];
         if (is_anon(m)) {
@@ -223,6 +225,7 @@ void proc_print_pages(struct Process *p) {
 }
 
 // attach to 'p', also wait until 'p' stops.
+// return 0 on success
 int proc_attach(struct Process *p) {
     long ptraceResult = ptrace(PTRACE_ATTACH, p->pid, NULL, NULL);
     if (ptraceResult < 0) {
@@ -238,3 +241,29 @@ void proc_detach(struct Process *p) {
     ptrace(PTRACE_DETACH, p->pid, NULL, NULL);
 }
 
+
+// return number of memory regions
+int proc_mr_num(struct Process *p) {
+    return p->maps_size;
+}
+
+struct MemReg *proc_get_mr(struct Process *p, int index) {
+    return &p->maps[index];
+}
+
+// return number of pages in mr
+int mr_page_num(struct MemReg *m) {
+    return (m->end - m->start ) / pageSize;
+}
+
+struct Page *mr_get_page(struct MemReg *m, int index) {
+    return &m->pages[index];
+}
+
+const char *mr_get_name(struct MemReg *m) {
+    return m->pathname;
+}
+
+uint32_t page_to_u32(struct Page *p) {
+    return p->hash;
+}
