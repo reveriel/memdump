@@ -71,6 +71,17 @@ int main(int argc, char const *argv[])
         struct data *data = rb_entry(p, struct data, node);
         printf("%d ", data->n);
     }
+    printf("\n");
+
+    struct data *data = rb_search_data(&the_root, 77);
+    data->n = 78;
+
+    printf("after :\n");
+    for (struct rb_node* p = rb_first(&the_root); p; p = rb_next(p)) {
+        struct data *data = rb_entry(p, struct data, node);
+        printf("%d ", data->n);
+    }
+    printf("\n");
 
     return 0;
 }
