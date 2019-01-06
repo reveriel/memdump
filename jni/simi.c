@@ -115,6 +115,17 @@ double set_jaccard(struct Set *a, struct Set *b) {
     return (double)y / (double)(x + y + z);
 }
 
+// return size of a \cap b
+int set_common(struct  Set *a, struct Set *b) {
+    int cnt = 0;
+    for (struct rb_node *p = rb_first(&a->root); p; p = rb_next(p)) {
+        struct Data *data = rb_entry(p, struct Data, node);
+        if (set_in(b, data))
+            ++cnt;
+    }
+    return cnt;
+}
+
 
 struct Data *data_init(uint32_t v) {
     struct Data *d = (struct Data*)malloc(sizeof(struct Data));

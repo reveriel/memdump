@@ -4,17 +4,23 @@
 
 #include <stdint.h>
 
+// this is not a set!
+// this is a multi set.
 struct Set;
 struct Data;
 
-
-/* super simple interface !  (0 w 0  */
-
 struct Set * set_init();
 void set_free(struct Set *s);
+
+// this is not a set!
+// this is a multi set.
 void set_add(struct Set *s, struct Data *data);
 int set_in(struct Set *s, struct Data * data);
 void set_print(struct Set *s);
+
+// return how many elements are in common
+// set_common({ a, b, b, c},  {b ,b } ) = 2
+int set_common(struct  Set *a, struct Set *b);
 /*
 how many element in a  are also in b ?
 */
@@ -27,6 +33,7 @@ how many element in a  are also in b ?
  =   ---------------------
             A \cup B
 */
+// set_jaccard({a,b, b}, {b,b, c}) = b,b/ a, b,b, c = 0.5
 double set_jaccard(struct Set *a, struct Set *b);
 
 
