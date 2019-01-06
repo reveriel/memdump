@@ -84,7 +84,9 @@ int main(int argc, char const *argv[])
     printf("\n");
 
     while (the_root.rb_node != NULL) {
+        struct data *d = rb_entry(the_root.rb_node, struct data, node);
         rb_erase(the_root.rb_node, &the_root);
+        free(d);
     }
 
     printf("after :\n");
