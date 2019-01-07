@@ -1,15 +1,18 @@
 #include "simi.h"
 #include <stdio.h>
 
-static void _test(int *d_a, int a_size, int *d_b, int b_size) {
+static void _test(int *d_a, int a_size, int *d_b, int b_size)
+{
     struct Set *a = set_init();
     struct Set *b = set_init();
 
-    for (int i = 0; i < a_size; i++) {
+    for (int i = 0; i < a_size; i++)
+    {
         set_add(a, data_init(d_a[i]));
     }
 
-    for (int i = 0; i < b_size; i++) {
+    for (int i = 0; i < b_size; i++)
+    {
         set_add(b, data_init(d_b[i]));
     }
 
@@ -32,8 +35,8 @@ static void _test(int *d_a, int a_size, int *d_b, int b_size) {
 
 int main(int argc, char const *argv[])
 {
-    int a1[] = {1,2,3,4,5};
-    int b1[] = {2,3,4,5,6};
+    int a1[] = {1, 2, 3, 4, 5};
+    int b1[] = {2, 3, 4, 5, 6};
     test(a1, b1);
 
     int a2[] = {1, 2, 2};
@@ -42,5 +45,3 @@ int main(int argc, char const *argv[])
 
     return 0;
 }
-
-

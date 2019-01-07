@@ -8,7 +8,6 @@ struct MemReg;
 
 struct Page;
 
-
 struct Process *proc_init(int pid);
 void proc_del(struct Process *p);
 
@@ -24,7 +23,6 @@ void proc_print_pages(struct Process *p);
 int proc_attach(struct Process *p);
 // detach from 'p', process 'p' will resume.
 void proc_detach(struct Process *p);
-
 
 // return number of memory regions
 int proc_mr_num(struct Process *p);

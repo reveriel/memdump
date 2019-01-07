@@ -18,19 +18,25 @@ struct Option opt;
 
 int main(int argc, char **argv)
 {
-    if (argc == 2) {
+    if (argc == 2)
+    {
         opt.net = false;
         opt.pid = atoi(argv[1]);
-    } else if (argc == 4) {
+    }
+    else if (argc == 4)
+    {
         opt.net = true;
         opt.pid = atoi(argv[1]);
         opt.ip_addr = argv[2];
         int count = sscanf(argv[3], "%d", &opt.port);
-        if (count == 0) {
+        if (count == 0)
+        {
             printf("Invalid port specified\n");
             return -1;
         }
-    } else {
+    }
+    else
+    {
         printf("%s <pid>\n", argv[0]);
         printf("%s <pid> <ip-address> <port>\n", argv[0]);
         exit(0);
@@ -53,4 +59,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-

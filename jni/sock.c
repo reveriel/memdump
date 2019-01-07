@@ -7,7 +7,8 @@
 #include "opt.h"
 
 /// set sock->fd;
-int open_socket(struct Sock *sock, struct Option *opt) {
+int open_socket(struct Sock *sock, struct Option *opt)
+{
     int serverSocket = -1;
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSocket == -1)
@@ -29,14 +30,14 @@ int open_socket(struct Sock *sock, struct Option *opt) {
     return 0;
 }
 
-void dump_memory_region_send(FILE* pMemFile, unsigned long start_address, long length, int serverSocket)
+void dump_memory_region_send(FILE *pMemFile, unsigned long start_address, long length, int serverSocket)
 {
     unsigned long address;
     int pageLength = 4096;
     unsigned char page[pageLength];
     fseeko(pMemFile, start_address, SEEK_SET);
 
-    for (address=start_address; address < start_address + length; address += pageLength)
+    for (address = start_address; address < start_address + length; address += pageLength)
     {
         fread(&page, 1, pageLength, pMemFile);
         if (serverSocket == -1)
@@ -50,4 +51,3 @@ void dump_memory_region_send(FILE* pMemFile, unsigned long start_address, long l
         }
     }
 }
-

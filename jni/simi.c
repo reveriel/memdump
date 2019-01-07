@@ -5,12 +5,14 @@
 #include "simi.h"
 #include "rbtree.h"
 
-struct Set {
+struct Set
+{
     struct rb_root root;
 };
 
-struct Data {
-    uint32_t v;  // search by v;
+struct Data
+{
+    uint32_t v; // search by v;
     struct rb_node node;
 };
 
@@ -19,7 +21,8 @@ static struct Data *rb_search_data(struct rb_root *root, int v)
 {
     struct rb_node *node = root->rb_node;
 
-    while (node) {
+    while (node)
+    {
         struct Data *cur_data = rb_entry(node, struct Data, node);
         if (v < cur_data->v)
             node = node->rb_left;
@@ -36,7 +39,8 @@ static void rb_insert_data(struct rb_root *root, struct Data *new)
     struct rb_node **link = &root->rb_node, *parent = NULL; // init parent! important!
     int value = new->v;
 
-    while (*link) {
+    while (*link)
+    {
         parent = *link;
         struct Data *cur_data = rb_entry(parent, struct Data, node);
         if (cur_data->v > value)
@@ -49,23 +53,28 @@ static void rb_insert_data(struct rb_root *root, struct Data *new)
     rb_insert_color(&new->node, root);
 }
 
-void set_add(struct Set *s, struct Data *data) {
+void set_add(struct Set *s, struct Data *data)
+{
     rb_insert_data(&s->root, data);
 }
 
-int set_in(struct Set *s, struct Data * data) {
+int set_in(struct Set *s, struct Data *data)
+{
     struct Data *d = rb_search_data(&s->root, data->v);
     return d != NULL;
 }
 
-struct Set *set_init() {
+struct Set *set_init()
+{
     struct Set *s = (struct Set *)malloc(sizeof(struct Set));
     s->root = RB_ROOT;
     return s;
 }
 
-void set_free(struct Set *s) {
-    while (s->root.rb_node != NULL) {
+void set_free(struct Set *s)
+{
+    while (s->root.rb_node != NULL)
+    {
         struct Data *data = rb_entry(s->root.rb_node, struct Data, node);
         rb_erase(s->root.rb_node, &s->root);
         free(data);
@@ -73,11 +82,13 @@ void set_free(struct Set *s) {
     free(s);
 }
 
-void set_print(struct Set *s) {
+void set_print(struct Set *s)
+{
     struct rb_root *root = &s->root;
     printf("{ ");
-    for (struct rb_node *p = rb_first(root); p; p = rb_next(p)) {
-        struct Data * data = rb_entry(p, struct Data, node);
+    for (struct rb_node *p = rb_first(root); p; p = rb_next(p))
+    {
+        struct Data *data = rb_entry(p, struct Data, node);
         data_print(data);
         printf(" ");
     }
@@ -95,10 +106,12 @@ void set_print(struct Set *s) {
     z = in b not in a
     return ( y ) / (x + y + z);
 */
-double set_jaccard(struct Set *a, struct Set *b) {
+double set_jaccard(struct Set *a, struct Set *b)
+{
     int x = 0, y = 0;
     // for data in set 'a', search in set 'b';
-    for (struct rb_node *p = rb_first(&a->root); p; p = rb_next(p)) {
+    for (struct rb_node *p = rb_first(&a->root); p; p = rb_next(p))
+    {
         struct Data *data = rb_entry(p, struct Data, node);
         if (set_in(b, data))
             ++y;
@@ -106,9 +119,10 @@ double set_jaccard(struct Set *a, struct Set *b) {
             ++x;
     }
     int z = 0;
-    for (struct rb_node *p = rb_first(&b->root); p; p = rb_next(p)) {
-         struct Data *data = rb_entry(p, struct Data, node);
-         if (!set_in(a, data))
+    for (struct rb_node *p = rb_first(&b->root); p; p = rb_next(p))
+    {
+        struct Data *data = rb_entry(p, struct Data, node);
+        if (!set_in(a, data))
             ++z;
     }
 
@@ -116,9 +130,11 @@ double set_jaccard(struct Set *a, struct Set *b) {
 }
 
 // return size of a \cap b
-int set_common(struct  Set *a, struct Set *b) {
+int set_common(struct Set *a, struct Set *b)
+{
     int cnt = 0;
-    for (struct rb_node *p = rb_first(&a->root); p; p = rb_next(p)) {
+    for (struct rb_node *p = rb_first(&a->root); p; p = rb_next(p))
+    {
         struct Data *data = rb_entry(p, struct Data, node);
         if (set_in(b, data))
             ++cnt;
@@ -126,18 +142,19 @@ int set_common(struct  Set *a, struct Set *b) {
     return cnt;
 }
 
-
-struct Data *data_init(uint32_t v) {
-    struct Data *d = (struct Data*)malloc(sizeof(struct Data));
+struct Data *data_init(uint32_t v)
+{
+    struct Data *d = (struct Data *)malloc(sizeof(struct Data));
     d->v = v;
     return d;
 }
 
-void data_free(struct Data *d) {
+void data_free(struct Data *d)
+{
     free(d);
 }
 
-void data_print(struct Data *d) {
+void data_print(struct Data *d)
+{
     printf("%u", d->v);
 }
-
