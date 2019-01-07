@@ -17,7 +17,7 @@ struct Data
 };
 
 // search by 'n'
-static struct Data *rb_search_data(struct rb_root *root, int v)
+static struct Data *rb_search_data(struct rb_root *root, uint32_t v)
 {
     struct rb_node *node = root->rb_node;
 
@@ -37,7 +37,7 @@ static struct Data *rb_search_data(struct rb_root *root, int v)
 static void rb_insert_data(struct rb_root *root, struct Data *new)
 {
     struct rb_node **link = &root->rb_node, *parent = NULL; // init parent! important!
-    int value = new->v;
+    uint32_t value = new->v;
 
     while (*link)
     {
