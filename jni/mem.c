@@ -102,55 +102,54 @@ int kpageflags_fd = -1;
 #define BIT(name)               (1ULL << KPF_##name)
 #define BITS_COMPOUND           (BIT(COMPOUND_HEAD) | BIT(COMPOUND_TAIL))
 
-
 static const char * const page_flag_names[] = {
-        [KPF_LOCKED]            = "L:locked",
-        [KPF_ERROR]             = "E:error",
-        [KPF_REFERENCED]        = "R:referenced",
-        [KPF_UPTODATE]          = "U:uptodate",
-        [KPF_DIRTY]             = "D:dirty",
-        [KPF_LRU]               = "l:lru",
-        [KPF_ACTIVE]            = "A:active",
-        [KPF_SLAB]              = "S:slab",
-        [KPF_WRITEBACK]         = "W:writeback",
-        [KPF_RECLAIM]           = "I:reclaim",
-        [KPF_BUDDY]             = "B:buddy",
+    [KPF_LOCKED]            = "L:locked",
+    [KPF_ERROR]             = "E:error",
+    [KPF_REFERENCED]        = "R:referenced",
+    [KPF_UPTODATE]          = "U:uptodate",
+    [KPF_DIRTY]             = "D:dirty",
+    [KPF_LRU]               = "l:lru",
+    [KPF_ACTIVE]            = "A:active",
+    [KPF_SLAB]              = "S:slab",
+    [KPF_WRITEBACK]         = "W:writeback",
+    [KPF_RECLAIM]           = "I:reclaim",
+    [KPF_BUDDY]             = "B:buddy",
 
-        [KPF_MMAP]              = "M:mmap",
-        [KPF_ANON]              = "a:anonymous",
-        [KPF_SWAPCACHE]         = "s:swapcache",
-        [KPF_SWAPBACKED]        = "b:swapbacked",
-        [KPF_COMPOUND_HEAD]     = "H:compound_head",
-        [KPF_COMPOUND_TAIL]     = "T:compound_tail",
-        [KPF_HUGE]              = "G:huge",
-        [KPF_UNEVICTABLE]       = "u:unevictable",
-        [KPF_HWPOISON]          = "X:hwpoison",
-        [KPF_NOPAGE]            = "n:nopage",
-        [KPF_KSM]               = "x:ksm",
-        [KPF_THP]               = "t:thp",
-        [KPF_BALLOON]           = "o:balloon",
-        [KPF_PGTABLE]           = "g:pgtable",
-        [KPF_ZERO_PAGE]         = "z:zero_page",
-        [KPF_IDLE]              = "i:idle_page",
+    [KPF_MMAP]              = "M:mmap",
+    [KPF_ANON]              = "a:anonymous",
+    [KPF_SWAPCACHE]         = "s:swapcache",
+    [KPF_SWAPBACKED]        = "b:swapbacked",
+    [KPF_COMPOUND_HEAD]     = "H:compound_head",
+    [KPF_COMPOUND_TAIL]     = "T:compound_tail",
+    [KPF_HUGE]              = "G:huge",
+    [KPF_UNEVICTABLE]       = "u:unevictable",
+    [KPF_HWPOISON]          = "X:hwpoison",
+    [KPF_NOPAGE]            = "n:nopage",
+    [KPF_KSM]               = "x:ksm",
+    [KPF_THP]               = "t:thp",
+    [KPF_BALLOON]           = "o:balloon",
+    [KPF_PGTABLE]           = "g:pgtable",
+    [KPF_ZERO_PAGE]         = "z:zero_page",
+    [KPF_IDLE]              = "i:idle_page",
 
-        [KPF_RESERVED]          = "r:reserved",
-        [KPF_MLOCKED]           = "m:mlocked",
-        [KPF_MAPPEDTODISK]      = "d:mappedtodisk",
-        [KPF_PRIVATE]           = "P:private",
-        [KPF_PRIVATE_2]         = "p:private_2",
-        [KPF_OWNER_PRIVATE]     = "O:owner_private",
-        [KPF_ARCH]              = "h:arch",
-        [KPF_UNCACHED]          = "c:uncached",
-        [KPF_SOFTDIRTY]         = "f:softdirty",
+    [KPF_RESERVED]          = "r:reserved",
+    [KPF_MLOCKED]           = "m:mlocked",
+    [KPF_MAPPEDTODISK]      = "d:mappedtodisk",
+    [KPF_PRIVATE]           = "P:private",
+    [KPF_PRIVATE_2]         = "p:private_2",
+    [KPF_OWNER_PRIVATE]     = "O:owner_private",
+    [KPF_ARCH]              = "h:arch",
+    [KPF_UNCACHED]          = "c:uncached",
+    [KPF_SOFTDIRTY]         = "f:softdirty",
 
-        [KPF_READAHEAD]         = "I:readahead",
-        [KPF_SLOB_FREE]         = "P:slob_free",
-        [KPF_SLUB_FROZEN]       = "A:slub_frozen",
-        [KPF_SLUB_DEBUG]        = "E:slub_debug",
+    [KPF_READAHEAD]         = "I:readahead",
+    [KPF_SLOB_FREE]         = "P:slob_free",
+    [KPF_SLUB_FROZEN]       = "A:slub_frozen",
+    [KPF_SLUB_DEBUG]        = "E:slub_debug",
 
-        [KPF_FILE]              = "F:file",
-        [KPF_SWAP]              = "w:swap",
-        [KPF_MMAP_EXCLUSIVE]    = "1:mmap_exclusive",
+    [KPF_FILE]              = "F:file",
+    [KPF_SWAP]              = "w:swap",
+    [KPF_MMAP_EXCLUSIVE]    = "1:mmap_exclusive",
 };
 
 /**
@@ -362,7 +361,7 @@ static void read_mem(struct Process *p)
 
     for (int i = 0; i < (int)p->maps_size; i++)
     {
-        struct MemReg *m = &p->maps[i];
+        struct MemReg *m = proc_get_mr(p, i);
         size_t numPages = (m->end - m->start) / pageSize + 1;
         m->pages = (struct Page *)malloc(sizeof(struct Page) * numPages);
 
@@ -387,7 +386,7 @@ static void read_mem(struct Process *p)
     }
 }
 
-static bool is_anon(struct MemReg *m)
+static inline bool mr_is_anon(struct MemReg *m)
 {
     return !m->pathname || m->pathname[0] == '[';
 }
@@ -399,23 +398,18 @@ static void filter_anon_mr(struct Process *p)
     // decide new p->maps's size;
     // fprintf(stderr, "maps size = %zu\n", p->maps_size);
     for (int i = 0; i < (int)p->maps_size; i++)
-    {
-        struct MemReg *m = &p->maps[i];
-        if (is_anon(m))
-        {
+        if (mr_is_anon(proc_get_mr(p, i)))
             anon_num++;
-        }
-    }
-    struct MemReg *anonM = (struct MemReg *)malloc(sizeof(struct MemReg) * anon_num);
+
+    struct MemReg *new_maps = (struct MemReg *)malloc(sizeof(struct MemReg) * anon_num);
     int j = 0;
     for (int i = 0; i < (int)p->maps_size; i++)
-    {
-        if (is_anon(&p->maps[i]))
-            anonM[j++] = p->maps[i];
-    }
+        if (mr_is_anon(proc_get_mr(p, i)))
+            new_maps[j++] = p->maps[i];
+
     free(p->maps);
     p->maps_size = p->maps_cap = anon_num;
-    p->maps = anonM;
+    p->maps = new_maps;
 }
 
 static void parse_maps(struct Process *p)
@@ -442,10 +436,13 @@ static char *page_flag_name(uint64_t flags)
 {
     static char buf[65];
     size_t i, j;
-    for (i = 0, j = 0; i < ARRAY_SIZE(page_flag_names); i++) {
+    for (i = 0, j = 0; i < ARRAY_SIZE(page_flag_names); i++)
+    {
         int present = (flags >> i) & 1;
-        if (!page_flag_names[i]) {
-            if (present) {
+        if (!page_flag_names[i])
+        {
+            if (present)
+            {
                 fprintf(stderr, "unknown flag bit %zu\n", i);
                 exit(EXIT_FAILURE);
             }
@@ -489,7 +486,6 @@ static unsigned long pagemap_read(int fd, uint64_t *buf,
 {
     return do_u64_read(fd, "/proc/pid/pagemap", buf, index, pages);
 }
-
 
 static unsigned long kpageflags_read(uint64_t *buf,
                                      unsigned long index, unsigned long pages)
@@ -623,7 +619,11 @@ static void mr_parse_pagemap(struct MemReg *m, int fd)
 static void parse_pagemap(struct Process *p)
 {
     for (int i = 0; i < (int)p->maps_size; i++)
-        mr_parse_pagemap(&p->maps[i], p->pagemap_fd);
+    {
+        proc_get_mr(p, i);
+        struct MemReg *mr = proc_get_mr(p, i);
+        mr_parse_pagemap(mr, p->pagemap_fd);
+    }
 }
 
 void proc_do(struct Process *p)
@@ -641,7 +641,7 @@ void proc_print_maps(struct Process *p)
 {
     for (int i = 0; i < (int)p->maps_size; i++)
     {
-        struct MemReg *m = &p->maps[i];
+        struct MemReg *m = proc_get_mr(p, i);
         fprintf(stderr, "%08lx-%08lx \t %s\n", m->start, m->end, m->pathname);
     }
 }
@@ -659,7 +659,7 @@ void proc_print_pages(struct Process *p)
 {
     for (int i = 0; i < (int)p->maps_size; i++)
     {
-        struct MemReg *m = &p->maps[i];
+        struct MemReg *m = proc_get_mr(p, i);
         fprintf(stderr, "%012lx-%012lx \t %s\n", m->start, m->end, m->pathname);
         mem_print_pages(m);
     }
@@ -692,7 +692,7 @@ int proc_mr_num(struct Process *p)
     return p->maps_size;
 }
 
-struct MemReg *proc_get_mr(struct Process *p, int index)
+inline struct MemReg *proc_get_mr(struct Process *p, int index)
 {
     return &p->maps[index];
 }
@@ -720,6 +720,5 @@ uint32_t page_to_u32(struct Page *p)
 
 int page_is_zero(struct Page *p)
 {
-
     return p->hash == zero_page_hash;
 }
