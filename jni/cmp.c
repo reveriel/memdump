@@ -22,7 +22,11 @@ struct Set *build_set_from_mr(struct MemReg *m) {
     struct Set *s =  set_init();
     int n = mr_page_num(m);
     for (int i = 0; i < n; i++) {
-        set_add(s, data_init(page_to_u32(mr_get_page(m, i))));
+        // filter zero page  ?
+        struct Page *page = mr_get_page(m, i);
+        if (page_is_zero(page))
+            continue;
+        set_add(s, data_init(page_to_u32(page)));
     }
     return s;
 }

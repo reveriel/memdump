@@ -7,6 +7,9 @@
 #include "mem.h"
 #include "opt.h"
 
+bool zero_page_hash_ready = false;
+uint32_t zero_page_hash = 0;
+
 struct Process {
     int pid;
     int ppid;
@@ -17,7 +20,7 @@ struct Process {
     FILE *pMapsFile;
     FILE *pMemFile;
     // some mem mem region has no name;
-    // give it an unique name "[<no_name_cnt>]"
+    // give it an unique name "[<no_name_cnt:start>]"
     int no_name_cnt;
 };
 
@@ -54,6 +57,7 @@ static int open_files(struct Process *p) {
     }
     return 0;
 }
+
 
 // return NULL if failed
 struct Process *proc_init(int pid) {
@@ -115,7 +119,7 @@ static void parse_maps_line(char *line, struct MemReg* m, struct Process *p) {
     if (strlen(path) != 0) {
         m->pathname = strdup(path);
     } else {
-        sprintf(path, "[%d]", p->no_name_cnt++);
+        sprintf(path, "[%d:%lx]", p->no_name_cnt++, m->start);
         m->pathname = strdup(path);
     }
 }
@@ -276,3 +280,20 @@ const char *mr_get_name(struct MemReg *m) {
 uint32_t page_to_u32(struct Page *p) {
     return p->hash;
 }
+
+static void init_zero_page_hash() {
+    uint8_t page[pageSize];
+    memset(page, 0, pageSize);
+    zero_page_hash = page_hash(page, pageSize);
+}
+
+int page_is_zero(struct Page *p) {
+    if (!zero_page_hash_ready)
+        init_zero_page_hash();
+
+    return p->hash == zero_page_hash;
+}
+
+
+
+

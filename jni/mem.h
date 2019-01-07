@@ -28,5 +28,6 @@ struct Page *mr_get_page(struct MemReg *m, int index);
 const char *mr_get_name(struct MemReg *m);
 
 uint32_t page_to_u32(struct Page *p);
+int page_is_zero(struct Page *p);
 
 #endif
