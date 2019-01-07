@@ -105,15 +105,8 @@ int main(int argc, char const *argv[])
         goto err;
     }
 
-    if (proc_attach(p1)) {
-        fprintf(stderr, "proc_attach p1 %d, failed. exit\n", pid1);
-        goto err;
-    }
-
-    if (proc_attach(p2)) {
-        fprintf(stderr, "proc_attach p2 %d, failed. exit\n", pid2);
-        goto err;
-    }
+    proc_attach(p1);
+    proc_attach(p2);
 
     proc_do(p1);
     proc_do(p2);
@@ -132,8 +125,6 @@ err:
     proc_del(p2);
     return -1;
 }
-
-
 
 
 

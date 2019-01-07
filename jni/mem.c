@@ -91,31 +91,39 @@ void proc_del(struct Process *p) {
 static void parse_maps_line(char *line, struct MemReg* m, struct Process *p) {
     unsigned long start_address;
     unsigned long end_address;
-    char perms[5];
-    int offset;
-    char dev[8]; // some has value '2d' which is wired;
-    int inode;
+    char r, w, x, s;
+    unsigned long long pgoff;
+    int major, minor; // device
+    unsigned long inode;
     char path[256];
     memset(path, 0, 256);
-    memset(dev, 0, 8);
 
-    // format: addr-addr perms offset major:minor inode path
-    int ret = sscanf(line, "%lx-%lx %s %x %s %d %[^\n]\n",
+    // format: addr-addr perms pgoff major:minor inode path
+    int ret = sscanf(line, "%lx-%lx %c%c%c%c %llx %x:%x %lu %[^\n]\n",
                     &start_address, &end_address,
-                    perms, &offset, dev, &inode, path);
-    if (ret != 7 && ret != 6) {
+                    &r, &w, &x, &s,
+                    &pgoff,
+                    &major, &minor,
+                    &inode,
+                    path);
+    if (ret < 10) {
         fprintf(stderr, "ret = %d\n", ret);
         fprintf(stderr, "%s: sscanf failed\n", __func__);
         // check by human, if correct
-        fprintf(stderr, "%lx-%lx %s %x %s %d %s\n",
+        fprintf(stderr, "%lx-%lx %c%c%c%c %llx %x:%x %lu %s\n",
                         start_address, end_address,
-                        perms, offset, dev, inode, path);
+                        r, w, x, s,
+                        pgoff,
+                        major, minor,
+                        inode,
+                        path);
         fprintf(stderr, "%s\n", line);
         return;
     }
 
     m->start = start_address;
     m->end = end_address;
+    // some vma doesn't have a nome, make one for it.
     if (strlen(path) != 0) {
         m->pathname = strdup(path);
     } else {
@@ -142,6 +150,8 @@ static uint32_t page_hash(uint8_t *page, size_t length) {
 // read all pages in.. anonymous vma;
 static void read_mem(struct Process *p) {
     uint8_t page[pageSize];
+
+
 
     for (int i = 0; i < p->maps_size; i++) {
         struct MemReg *m = &p->maps[i];
@@ -242,8 +252,9 @@ void proc_print_pages(struct Process *p) {
 int proc_attach(struct Process *p) {
     long ptraceResult = ptrace(PTRACE_ATTACH, p->pid, NULL, NULL);
     if (ptraceResult < 0) {
-        fprintf(stderr, "Unable to attach to the pid specified\n");
-        return -1;
+        fprintf(stderr, "Unable to attach to the process %d .\n", p->pid);
+        perror(NULL);
+        exit(EXIT_FAILURE);
     }
     wait(NULL); // wait for tracee to stop
     return 0;

@@ -15,7 +15,7 @@ struct Data {
 };
 
 // search by 'n'
-static struct Data * rb_search_data(struct rb_root *root, int v)
+static struct Data *rb_search_data(struct rb_root *root, int v)
 {
     struct rb_node *node = root->rb_node;
 

@@ -42,11 +42,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (proc_attach(p)) {
-        fprintf(stderr, "proc_attach failed. exit\n");
-        proc_del(p);
-        return -1;
-    }
+    proc_attach(p);
 
     proc_do(p);
     proc_print_maps(p);
