@@ -4,6 +4,10 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <sys/ptrace.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include "mem.h"
 #include "opt.h"
 
@@ -19,6 +23,7 @@ struct Process {
     size_t maps_cap;
     FILE *pMapsFile;
     FILE *pMemFile;
+    int pagemap_fd; // fd, we wiill use open(), not fopen().
     // some mem mem region has no name;
     // give it an unique name "[<no_name_cnt:start>]"
     int no_name_cnt;
@@ -38,39 +43,57 @@ struct Page {
 
 const size_t pageSize = 4096;
 
-// return 0 on success
-static int open_files(struct Process *p) {
-    char mapsFilename[1024];
-    sprintf(mapsFilename, "/proc/%d/maps", p->pid);
-    p->pMapsFile = fopen(mapsFilename, "r");
-    if (p->pMapsFile == NULL) {
-        fprintf(stderr, "fopen file: %s failed\n", mapsFilename);
-        return 1;
+#define min_t(type, x, y) ({    \
+    type __min1 = (x);          \
+    type __min2 = (y);          \
+    __min1 < __min2 ? __min1 : __min2; })
+
+#define max_t(type, x, y) ({    \
+    type __max1 = (x);          \
+    type __max2 = (y);          \
+    __max1 > __max2 ? __max1 : __max2;  })
+
+static FILE* open_proc_file(const char *filename) {
+    FILE *f = fopen(filename, "r");
+    if (f == NULL) {
+        fprintf(stderr, "fopen file: %s failed\n", filename);
+        perror(NULL);
+        exit(EXIT_FAILURE);
     }
-    char memFilename[1024];
-    sprintf(memFilename, "/proc/%d/mem", p->pid);
-    p->pMemFile = fopen(memFilename, "r");
-    if (p->pMapsFile == NULL) {
-        fprintf(stderr, "fopen file: %s failed\n", memFilename);
-        fclose(p->pMapsFile);
-        return 1;
+    return f;
+};
+
+static int checked_open(const char *filename, int flags) {
+    int fd = open(filename, flags);
+    if (fd < 0) {
+        perror(filename);
+        exit(EXIT_FAILURE);
     }
-    return 0;
+    return fd;
 }
 
+static void open_proc_files(struct Process *p) {
+    char file[128];
+    sprintf(file, "/proc/%d/maps", p->pid);
+    p->pMapsFile = open_proc_file(file);
+    memset(file, 0, 128);
+    sprintf(file, "/proc/%d/mem", p->pid);
+    p->pMemFile = open_proc_file(file);
+    memset(file, 0, 128);
+    sprintf(file, "/proc/%d/pagemap", p->pid);
+    p->pagemap_fd = checked_open(file, O_RDONLY);
+}
 
 // return NULL if failed
 struct Process *proc_init(int pid) {
     struct Process *p = (struct Process *)malloc(sizeof(struct Process));
     p->pid = pid;
     p->no_name_cnt = 0;
-    if (open_files(p)) {
-        free(p);
-        return NULL;
-    }
+    p->pMapsFile = NULL;
+    p->pMemFile = NULL;
+    p->pagemap_fd = -1;
     return p;
 }
-
 
 void proc_del(struct Process *p) {
     if (!p)
@@ -151,8 +174,6 @@ static uint32_t page_hash(uint8_t *page, size_t length) {
 static void read_mem(struct Process *p) {
     uint8_t page[pageSize];
 
-
-
     for (int i = 0; i < p->maps_size; i++) {
         struct MemReg *m = &p->maps[i];
         size_t numPages = (m->end - m->start) / pageSize + 1;
@@ -181,7 +202,7 @@ static bool is_anon(struct MemReg *m) {
 }
 
 // filter p->maps, filter out non-anonymous region
-static void filter_anon(struct Process *p) {
+static void filter_anon_mr(struct Process *p) {
     size_t anon_num = 0;
     // decide new p->maps's size;
     // fprintf(stderr, "maps size = %zu\n", p->maps_size);
@@ -203,6 +224,7 @@ static void filter_anon(struct Process *p) {
 }
 
 static void parse_maps(struct Process *p) {
+    // p->maps is a dynamicly allocated array, size double if full.
     p->maps_size = 0;
     p->maps_cap = 4;
     p->maps = (struct MemReg*)malloc(p->maps_cap * sizeof(struct MemReg));
@@ -219,9 +241,59 @@ static void parse_maps(struct Process *p) {
     }
 }
 
+static unsigned long do_u64_read(int fd, const char *name, uint64_t *buf,
+                                 unsigned long index, unsigned long count)
+{
+    long bytes;
+
+    if (index > ULONG_MAX / 8) {
+        fprintf(stderr, "index overflow: %lu\n", index);
+        exit(EXIT_FAILURE);
+    }
+    bytes = pread(fd, buf, count * 8, (off_t)index * 8);
+    if (bytes < 0) {
+        perror(name);
+        exit(EXIT_FAILURE);
+    }
+    if (bytes % 8) {
+        fprintf(stderr, "partial read: %lu bytes\n", bytes);
+        exit(EXIT_FAILURE);
+    }
+    return bytes / 8;
+}
+
+static unsigned long pagesmap_read(int fd, uint64_t *buf,
+                                   unsigned long index, unsigned long pages)
+{
+    return do_u64_read(fd, "/proc/pid/pagemap", buf, index, pages);
+}
+
+#define PAGEMAP_BATCH	(64 << 10)
+static void parse_pagemap(struct MemReg *m, int fd) {
+    uint64_t buf[PAGEMAP_BATCH];
+    // number of ?
+    int count = m->end - m->start;
+    unsigned long index = m->start;
+    while (count) {
+        unsigned long batch = min_t(unsigned long, count, PAGEMAP_BATCH);
+        unsigned long pages = pagemap_read(fd, buf, index, batch);
+        if (pages == 0)
+            break;
+       for (unsigned long i; i < pages; i++)  {
+            //
+       }
+       index += pages;
+       count -= pages;
+    }
+}
+
+
 void proc_do(struct Process *p) {
+    open_proc_files(p);
     parse_maps(p);
-    filter_anon(p);
+    // filter_small_mr(p);
+    filter_anon_mr(p);
+
     read_mem(p);
 }
 

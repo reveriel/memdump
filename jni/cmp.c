@@ -5,7 +5,7 @@
  *    cmp <pid> <pid>
  */
 #include <stdio.h>
-// #include <stdlib.h>
+#include <stdlib.h>
 #include "mem.h"
 #include "simi.h"
 
@@ -100,10 +100,6 @@ int main(int argc, char const *argv[])
 
     struct Process *p1 = proc_init(pid1);
     struct Process *p2 = proc_init(pid2);
-    if (!p1 || !p2) {
-        fprintf(stderr, "proc_init failed. exit\n");
-        goto err;
-    }
 
     proc_attach(p1);
     proc_attach(p2);
@@ -120,10 +116,6 @@ int main(int argc, char const *argv[])
     proc_del(p1);
     proc_del(p2);
     return 0;
-err:
-    proc_del(p1);
-    proc_del(p2);
-    return -1;
 }
 
 
