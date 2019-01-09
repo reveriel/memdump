@@ -83,7 +83,11 @@ void print_simi(struct Process *p1, struct Process *p2)
     for (int i = 0, total = n1 * n2; i < total; i++)
     {
         struct Redund *r = &redunds[i];
-        fprintf(stderr, "%d \t%s, %s\n", r->comm, mr_get_name(r->m1), mr_get_name(r->m2));
+        if (r->comm == 0)
+            continue;
+        fprintf(stderr, "%d %s %lx %s %lx\n", r->comm,
+                mr_get_name(r->m1), mr_get_start(r->m1),
+                mr_get_name(r->m2), mr_get_start(r->m2));
     }
 
     free(redunds);
@@ -128,5 +132,7 @@ int main(int argc, char const *argv[])
 
     proc_del(p1);
     proc_del(p2);
+
+    mem_time_report();
     return 0;
 }

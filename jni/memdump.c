@@ -48,7 +48,7 @@ int main(int argc, char **argv)
     proc_do(p);
     proc_detach(p);
 
-    // proc_print_maps(p);
+    proc_print_maps(p);
     // proc_print_pages(p);
 
     // similarity of each pair of memory region
@@ -57,5 +57,6 @@ int main(int argc, char **argv)
 
     proc_del(p);
 
+    mem_time_report();
     return 0;
 }

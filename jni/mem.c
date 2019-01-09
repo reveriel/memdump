@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <time.h>
 #include "mem.h"
 #include "opt.h"
 
@@ -22,6 +23,12 @@ bool zero_page_hash_ready = false;
 uint32_t zero_page_hash = 0;
 bool kpageflags_fd_ready = false;
 int kpageflags_fd = -1;
+// not closed.. sorry
+
+struct Timer {
+    clock_t start;
+    clock_t total;
+} timer;
 
 /*
  * pagemap kernel ABI bits
@@ -293,6 +300,7 @@ void proc_del(struct Process *p)
         return;
     fclose(p->pMapsFile);
     fclose(p->pMemFile);
+    close(p->pagemap_fd);
     for (int i = 0; i < (int)p->maps_size; i++)
     {
         if (p->maps[i].pages)
@@ -391,28 +399,9 @@ static inline bool mr_is_anon(struct MemReg *m)
     return !m->pathname || m->pathname[0] == '[';
 }
 
-// filter p->maps, filter out non-anonymous region
-static void filter_anon_mr(struct Process *p)
-{
-    size_t anon_num = 0;
-    // decide new p->maps's size;
-    // fprintf(stderr, "maps size = %zu\n", p->maps_size);
-    for (int i = 0; i < (int)p->maps_size; i++)
-        if (mr_is_anon(proc_get_mr(p, i)))
-            anon_num++;
-
-    struct MemReg *new_maps = (struct MemReg *)malloc(sizeof(struct MemReg) * anon_num);
-    int j = 0;
-    for (int i = 0; i < (int)p->maps_size; i++)
-        if (mr_is_anon(proc_get_mr(p, i)))
-            new_maps[j++] = p->maps[i];
-
-    free(p->maps);
-    p->maps_size = p->maps_cap = anon_num;
-    p->maps = new_maps;
-}
-
-static void parse_maps(struct Process *p)
+// if 'filter_anon, only save anonymous memory region
+// memory region size(number of pages) <= 'minsize' will be ignored
+static void parse_maps(struct Process *p, bool filter_anon, int minsize)
 {
     // p->maps is a dynamicly allocated array, size double if full.
     p->maps_size = 0;
@@ -427,7 +416,15 @@ static void parse_maps(struct Process *p)
             p->maps_cap *= 2;
             p->maps = (struct MemReg *)realloc(p->maps, p->maps_cap * sizeof(struct MemReg));
         }
-        parse_maps_line(line, &p->maps[p->maps_size], p);
+
+        struct MemReg *mr = proc_get_mr(p, p->maps_size);
+
+        parse_maps_line(line, mr, p);
+        if (filter_anon && !mr_is_anon(mr))
+            continue;
+        if (mr_page_num(mr) <= minsize)
+            continue;
+
         p->maps_size++;
     }
 }
@@ -519,7 +516,7 @@ static unsigned long pagemap_pfn(uint64_t val)
 static void show_page(unsigned long voffset, unsigned long offset,
                       uint64_t flags)
 {
-    fprintf(stderr, "%lx %lx \t%s\n", voffset, offset, page_flag_name(flags));
+    // fprintf(stderr, "%lx %lx \t%s\n", voffset, offset, page_flag_name(flags));
 }
 
 static uint64_t kpageflags_flags(uint64_t flags, uint64_t pme)
@@ -600,7 +597,6 @@ static void mr_parse_pagemap(struct MemReg *m, int fd)
         unsigned long batch = min_t(unsigned long, count, PAGEMAP_BATCH);
         // how many entry has been read
         unsigned long pages = pagemap_read(fd, buf, index, batch);
-        fprintf(stderr, "pages = %lu\n", pages);
         if (pages == 0)
             break;
         for (unsigned long i = 0; i < pages; i++)
@@ -626,23 +622,47 @@ static void parse_pagemap(struct Process *p)
     }
 }
 
+void mem_time_report()
+{
+    fprintf(stderr, "read_mem time : %lf s\n", ((double)timer.total) / CLOCKS_PER_SEC );
+}
+
+static void time_start()
+{
+    timer.start = clock();
+}
+
+static void time_end()
+{
+    timer.total += clock() - timer.start;
+    timer.start = 0;
+}
+
 void proc_do(struct Process *p)
 {
     open_proc_files(p);
-    parse_maps(p);
-    // filter_small_mr(p);
-    filter_anon_mr(p); //  if don't do this, fread can get I/O error
-    parse_pagemap(p);
+    parse_maps(p,
+               true, // only parse anonymous memory region
+               1); // page number <= 1, will be ignored
 
-    read_mem(p);
+    // parse_pagemap(p);
+
+    time_start();
+    read_mem(p); // this is the most time consumming part
+                // more than 90%
+    time_end();
 }
+
+
 
 void proc_print_maps(struct Process *p)
 {
+    fprintf(stderr, "start     -     end  nr_page \t name\n");
     for (int i = 0; i < (int)p->maps_size; i++)
     {
         struct MemReg *m = proc_get_mr(p, i);
-        fprintf(stderr, "%08lx-%08lx \t %s\n", m->start, m->end, m->pathname);
+        fprintf(stderr, "%08lx-%08lx %d \t %s\n",
+                m->start, m->end, mr_page_num(m), m->pathname);
     }
 }
 
@@ -711,6 +731,11 @@ struct Page *mr_get_page(struct MemReg *m, int index)
 const char *mr_get_name(struct MemReg *m)
 {
     return m->pathname;
+}
+
+unsigned long mr_get_start(struct MemReg *m)
+{
+    return m->start;
 }
 
 uint32_t page_to_u32(struct Page *p)

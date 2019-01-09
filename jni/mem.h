@@ -31,8 +31,12 @@ struct MemReg *proc_get_mr(struct Process *p, int index);
 int mr_page_num(struct MemReg *);
 struct Page *mr_get_page(struct MemReg *m, int index);
 const char *mr_get_name(struct MemReg *m);
+unsigned long mr_get_start(struct MemReg *m);
 
 uint32_t page_to_u32(struct Page *p);
 int page_is_zero(struct Page *p);
+
+
+void mem_time_report();
 
 #endif
