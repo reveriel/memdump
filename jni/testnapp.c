@@ -5,7 +5,7 @@
 
 // print to stderr, or you cannot see it with adb shell
 
-#define BUF_SIZE (4096 * 2)
+#define BUF_SIZE (4096 * 4)
 char g_buf[BUF_SIZE];
 
 static void do_something() {

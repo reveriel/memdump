@@ -19,6 +19,7 @@ void proc_del(struct Process *p);
 void proc_do(struct Process *p);
 void proc_print_maps(struct Process *p);
 void proc_print_pages(struct Process *p);
+int proc_get_pid(struct Process *p);
 
 // only parse /proc/pid/maps
 void proc_do_maps(struct Process *p);

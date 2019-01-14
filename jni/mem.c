@@ -750,6 +750,11 @@ inline struct MemReg *proc_get_mr(struct Process *p, int index)
     return &p->maps[index];
 }
 
+inline int proc_get_pid(struct Process *p)
+{
+    return p->pid;
+}
+
 // return number of pages in mr
 int mr_page_num(struct MemReg *m)
 {

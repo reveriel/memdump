@@ -11,99 +11,107 @@
 #include "mem.h"
 #include "simi.h"
 
-// redunency
-struct Redund
-{
-    int comm;
-    struct MemReg *m1;
-    struct MemReg *m2;
-};
+#define MAX_PID 32
 
-// compute similiarity between two memory regions
-
-struct Set *build_set_from_mr(struct MemReg *m)
+void set_add_mr(struct Set *s, struct MemReg *mr)
 {
-    struct Set *s = set_init();
-    int n = mr_page_num(m);
-    for (int i = 0; i < n; i++)
-    {
-        // filter zero page  ?
-        struct Page *page = mr_get_page(m, i);
+    for (int i = 0; i < mr_page_num(mr); i++) {
+        struct Page *page = mr_get_page(mr, i);
         if (page_is_zero(page))
             continue;
         set_add(s, data_init(page_to_u32(page)));
     }
+}
+
+struct Set *set_from_proc(struct Process *p)
+{
+    struct Set *s = set_init();
+
+    for (int i = 0; i < proc_mr_num(p); i++)
+    {
+        struct MemReg *mr = proc_get_mr(p, i);
+        set_add_mr(s, mr);
+    }
     return s;
 }
 
-int comp_redunds(const void *a, const void *b)
+// the set created will have no duplicated elements
+struct Set *uniq_set_from_proc(struct Process *p)
 {
-    return ((struct Redund *)a)->comm - ((struct Redund *)b)->comm;
-}
-
-void print_simi(struct Process *p1, struct Process *p2)
-{
-    int n1 = proc_mr_num(p1);
-    int n2 = proc_mr_num(p2);
-
-    struct Set **sets1 = (struct Set **)malloc(sizeof(struct Set *) * n1);
-    struct Set **sets2 = (struct Set **)malloc(sizeof(struct Set *) * n2);
-
-    for (int i = 0; i < n1; i++)
+    struct Set *s = set_init();
+    for (int i = 0; i < proc_mr_num(p); i++)
     {
-        struct MemReg *m = proc_get_mr(p1, i);
-        sets1[i] = build_set_from_mr(m);
-    }
-    for (int i = 0; i < n2; i++)
-    {
-        struct MemReg *m = proc_get_mr(p2, i);
-        sets2[i] = build_set_from_mr(m);
-    }
-
-    struct Redund *redunds = (struct Redund *)malloc(sizeof(struct Redund) * n1 * n2);
-    if (redunds == NULL)
-    {
-        fprintf(stderr, "%s:%d, alloc failed\n", __func__, __LINE__);
-        goto out1;
-    }
-
-    for (int i = 0; i < n1; i++)
-    {
-        for (int j = 0; j < n2; j++)
+        struct MemReg *mr = proc_get_mr(p, i);
+        for (int j = 0; j < mr_page_num(mr); j++)
         {
-            struct Redund *r = &redunds[i * n2 + j];
-            r->comm = set_common(sets1[i], sets2[j]);
-            r->m1 = proc_get_mr(p1, i);
-            r->m2 = proc_get_mr(p2, j);
-            // double simi = simi_mrs(m1, m2);
-            // fprintf(stderr, "%lf \t %s, %s\n", simi, mr_get_name(m1), mr_get_name(m2));
+            struct Page *page = mr_get_page(mr, j);
+            if (page_is_zero(page))
+                continue;
+            struct Data *d = data_init(page_to_u32(page));
+            if (set_in(s, d))
+            {
+                data_free(d);
+                continue;
+            }
+            set_add(s, d);
         }
     }
-
-    qsort(redunds, n1 * n2, sizeof(struct Redund), comp_redunds);
-
-    for (int i = 0, total = n1 * n2; i < total; i++)
-    {
-        struct Redund *r = &redunds[i];
-        if (r->comm == 0)
-            continue;
-        fprintf(stderr, "%d %s %lx %s %lx\n", r->comm,
-                mr_get_name(r->m1), mr_get_start(r->m1),
-                mr_get_name(r->m2), mr_get_start(r->m2));
-    }
-
-    free(redunds);
-
-out1:
-    for (int i = 0; i < n1; i++)
-        set_free(sets1[i]);
-    for (int i = 0; i < n2; i++)
-        set_free(sets2[i]);
-    free(sets1);
-    free(sets2);
+    return s;
 }
 
-#define MAX_PID 32
+void print_intra_simi(struct Process **proc, int num)
+{
+    for (int i = 0; i < num; i++) {
+        struct Set *set = set_from_proc(proc[i]);
+        struct Set *uniq_set = uniq_set_from_proc(proc[i]);
+
+        fprintf(stderr, "%d %d\n", set_size(set) - set_size(uniq_set), set_size(set));
+
+        set_free(set);
+        set_free(uniq_set);
+    }
+}
+
+// how many nonzero pages can be found in other proceses.
+// this is inter process
+void print_inter_simi(struct Process **proc, int num)
+{
+    struct Set *set[MAX_PID];
+
+    for (int i = 0; i < num; i++)
+        set[i] = set_from_proc(proc[i]);
+
+    // inter process
+    for (int i = 0; i < num; i++)
+    {
+
+        int dup_page_nr = 0;
+        struct Data *d = set_first(set[i]);
+        do {
+            int found = 0;
+
+            for (int j = 0; j < num; j++) {
+                if (j == i)
+                    continue;
+                if (set_in(set[j], d)) {
+                    found = 1;
+                    break;
+                }
+            }
+
+            dup_page_nr += found;
+        } while (d = set_next(d), d);
+
+        // fprintf(stderr, "pid = %d, dup: %d %d\n", proc_get_pid(proc[i]),
+                // dup_page_nr, set_size(set[i]));
+
+        fprintf(stderr, "%d %d\n", dup_page_nr, set_size(set[i]));
+    }
+
+    for (int i = 0; i < num; i++)
+        set_free(set[i]);
+}
+
 int main(int argc, char const *argv[])
 {
     if (argc <= 2 || argc >= MAX_PID)
@@ -121,18 +129,22 @@ int main(int argc, char const *argv[])
     }
 
     for (int i = 0; i < num_pid; i++) {
-        fprintf(stderr, "%d\n", pid[i]);
-        // proc_attach(proc[i]);
-        // proc_do(proc[i]);
-        // proc_detach(proc[i]);
+        // fprintf(stderr, "%d\n", pid[i]);
+        proc_attach(proc[i]);
+        proc_do(proc[i]);
+        proc_detach(proc[i]);
     }
 
-    // print_simi(p1, p2);
+
+    // print_inter_simi(proc, num_pid);
+
+    print_intra_simi(proc, num_pid);
+
+
 
     for (int i = 0; i < num_pid; i++) {
         proc_del(proc[i]);
     }
-
     return 0;
 }
 

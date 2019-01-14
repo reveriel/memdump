@@ -17,6 +17,10 @@ void set_free(struct Set *s);
 void set_add(struct Set *s, struct Data *data);
 int set_in(struct Set *s, struct Data *data);
 void set_print(struct Set *s);
+int set_size(struct Set *s);
+
+struct Data *set_first(struct Set *s);
+struct Data *set_next(struct Data *d);
 
 // return how many elements are in common
 // set_common({ a, b, b, c},  {b ,b } ) = 2

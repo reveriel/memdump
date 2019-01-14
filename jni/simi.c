@@ -8,6 +8,7 @@
 struct Set
 {
     struct rb_root root;
+    int size;
 };
 
 struct Data
@@ -55,6 +56,7 @@ static void rb_insert_data(struct rb_root *root, struct Data *new)
 
 void set_add(struct Set *s, struct Data *data)
 {
+    s->size++;
     rb_insert_data(&s->root, data);
 }
 
@@ -68,7 +70,13 @@ struct Set *set_init()
 {
     struct Set *s = (struct Set *)malloc(sizeof(struct Set));
     s->root = RB_ROOT;
+    s->size = 0;
     return s;
+}
+
+int set_size(struct Set *s)
+{
+    return s->size;
 }
 
 void set_free(struct Set *s)
@@ -142,6 +150,19 @@ int set_common(struct Set *a, struct Set *b)
     return cnt;
 }
 
+struct Data *set_first(struct Set *s)
+{
+    return rb_entry(rb_first(&s->root), struct Data, node);
+}
+
+struct Data *set_next(struct Data *d)
+{
+    struct rb_node *n = rb_next(&d->node);
+    if (!n)
+        return NULL;
+    return rb_entry(rb_next(&d->node), struct Data, node);
+}
+
 struct Data *data_init(uint32_t v)
 {
     struct Data *d = (struct Data *)malloc(sizeof(struct Data));
@@ -158,3 +179,4 @@ void data_print(struct Data *d)
 {
     printf("%u", d->v);
 }
+

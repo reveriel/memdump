@@ -43,5 +43,20 @@ int main(int argc, char const *argv[])
     int b2[] = {2, 2};
     test(a2, b2);
 
+    
+    int c[] = {1, 2, 3};
+    
+    struct Set *s = set_init();
+    for (int i = 0; i < 3; i++)
+    {
+        set_add(s, data_init(c[i]));
+    }
+    
+    struct Data *d = set_first(s);
+    do {
+        data_print(d);
+    } while (d = set_next(d), d);
+    
+
     return 0;
 }
