@@ -1,8 +1,10 @@
 /**
- * cmp : compare two process's memory region
+ * setcmp, compare a set of process. calculate redundancy.
+ *
+ *   for each <pid>, compute how many pages of it are not unique.
  *
  * usage:
- *    cmp <pid> <pid>
+ *    setcmp <pid> <pid> <pid> <pid> ... <pid>
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,9 +87,7 @@ void print_simi(struct Process *p1, struct Process *p2)
         struct Redund *r = &redunds[i];
         if (r->comm == 0)
             continue;
-        fprintf(stderr, "%d/%d%s/%d%s %s %lx %s %lx\n", r->comm,
-                mr_page_num(r->m1), mr_get_perm(r->m1),
-                mr_page_num(r->m2), mr_get_perm(r->m2),
+        fprintf(stderr, "%d %s %lx %s %lx\n", r->comm,
                 mr_get_name(r->m1), mr_get_start(r->m1),
                 mr_get_name(r->m2), mr_get_start(r->m2));
     }
@@ -103,38 +103,37 @@ out1:
     free(sets2);
 }
 
+#define MAX_PID 32
 int main(int argc, char const *argv[])
 {
-    int pid1, pid2;
-    if (argc == 3)
+    if (argc <= 2 || argc >= MAX_PID)
     {
-        pid1 = atoi(argv[1]);
-        pid2 = atoi(argv[2]);
-    }
-    else
-    {
-        fprintf(stderr, "%s <pid> <pid>\n", argv[0]);
+        fprintf(stderr, "%s <pid> <pid> ...  <pid>\n", argv[0]);
         return -1;
     }
 
-    struct Process *p1 = proc_init(pid1);
-    struct Process *p2 = proc_init(pid2);
+    int num_pid = argc - 1;
+    int pid[MAX_PID];
+    struct Process *proc[MAX_PID];
+    for (int i = 0; i < num_pid; i++) {
+        pid[i] = atoi(argv[i+1]);
+        proc[i] = proc_init(pid[i]);
+    }
 
-    proc_attach(p1);
-    proc_attach(p2);
+    for (int i = 0; i < num_pid; i++) {
+        fprintf(stderr, "%d\n", pid[i]);
+        // proc_attach(proc[i]);
+        // proc_do(proc[i]);
+        // proc_detach(proc[i]);
+    }
 
-    proc_do(p1);
-    proc_do(p2);
+    // print_simi(p1, p2);
 
-    fprintf(stderr, "pid1 = %d, pid2 = %d\n", pid1, pid2);
-    print_simi(p1, p2);
+    for (int i = 0; i < num_pid; i++) {
+        proc_del(proc[i]);
+    }
 
-    proc_detach(p1);
-    proc_detach(p2);
-
-    proc_del(p1);
-    proc_del(p2);
-
-    mem_time_report();
     return 0;
 }
+
+

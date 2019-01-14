@@ -188,6 +188,7 @@ struct MemReg
     char perms;
     char *pathname;
     struct Page *pages;
+    char r, w, x, s;
 };
 
 struct Page
@@ -249,6 +250,13 @@ static int checked_open(const char *filename, int flags)
     return fd;
 }
 
+static void open_file_maps(struct Process *p)
+{
+    char file[128];
+    sprintf(file, "/proc/%d/maps", p->pid);
+    p->pMapsFile = open_proc_file(file);
+}
+
 static void open_proc_files(struct Process *p)
 {
     char file[128];
@@ -298,9 +306,12 @@ void proc_del(struct Process *p)
 {
     if (!p)
         return;
-    fclose(p->pMapsFile);
-    fclose(p->pMemFile);
-    close(p->pagemap_fd);
+    if (p->pMapsFile)
+        fclose(p->pMapsFile);
+    if (p->pMemFile)
+        fclose(p->pMemFile);
+    if (p->pagemap_fd != -1)
+        close(p->pagemap_fd);
     for (int i = 0; i < (int)p->maps_size; i++)
     {
         if (p->maps[i].pages)
@@ -350,6 +361,10 @@ static void parse_maps_line(char *line, struct MemReg *m, struct Process *p)
 
     m->start = start_address;
     m->end = end_address;
+    m->r = r;
+    m->w = w;
+    m->x = x;
+    m->s = s;
     // some vma doesn't have a nome, make one for it.
     if (strlen(path) != 0)
     {
@@ -360,6 +375,17 @@ static void parse_maps_line(char *line, struct MemReg *m, struct Process *p)
         sprintf(path, "[%d:%lx]", p->no_name_cnt++, m->start);
         m->pathname = strdup(path);
     }
+}
+
+// return mr's permision string "rwxs"
+char *mr_get_perm(struct MemReg *m)
+{
+    static char str[5];
+    str[0] = m->r;
+    str[1] = m->w;
+    str[2] = m->x;
+    str[3] = m->s;
+    return str;
 }
 
 // read all pages in.;
@@ -394,7 +420,7 @@ static void read_mem(struct Process *p)
     }
 }
 
-static inline bool mr_is_anon(struct MemReg *m)
+inline bool mr_is_anon(struct MemReg *m)
 {
     return !m->pathname || m->pathname[0] == '[';
 }
@@ -638,22 +664,29 @@ static void time_end()
     timer.start = 0;
 }
 
+void proc_do_maps(struct Process *p)
+{
+    open_file_maps(p);
+
+    parse_maps(p,
+               false, // only parse anonymous memory region
+               0);   // page number <= 1, will be ignored
+}
+
 void proc_do(struct Process *p)
 {
     open_proc_files(p);
     parse_maps(p,
                true, // only parse anonymous memory region
-               1); // page number <= 1, will be ignored
+               0);   // page number <= 1, will be ignored
 
     // parse_pagemap(p);
 
     time_start();
     read_mem(p); // this is the most time consumming part
-                // more than 90%
+                    // more than 90%
     time_end();
 }
-
-
 
 void proc_print_maps(struct Process *p)
 {

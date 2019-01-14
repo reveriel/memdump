@@ -1,6 +1,7 @@
 #ifndef _MEM_H
 #define _MEM_H
 #include <stdint.h>
+#include <stdbool.h>
 
 struct Process;
 
@@ -19,6 +20,9 @@ void proc_do(struct Process *p);
 void proc_print_maps(struct Process *p);
 void proc_print_pages(struct Process *p);
 
+// only parse /proc/pid/maps
+void proc_do_maps(struct Process *p);
+
 // attach to 'p', also wait until 'p' stops.
 int proc_attach(struct Process *p);
 // detach from 'p', process 'p' will resume.
@@ -32,6 +36,9 @@ int mr_page_num(struct MemReg *);
 struct Page *mr_get_page(struct MemReg *m, int index);
 const char *mr_get_name(struct MemReg *m);
 unsigned long mr_get_start(struct MemReg *m);
+char *mr_get_perm(struct MemReg *m);
+bool mr_is_anon(struct MemReg *m);
+
 
 uint32_t page_to_u32(struct Page *p);
 int page_is_zero(struct Page *p);
