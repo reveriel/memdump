@@ -11,11 +11,15 @@ adapted from [memdump](https://security.stackexchange.com/questions/62300/memory
 ndk-build
 ```
 
+see file `jni/Android.mk`
+
 ## test
 
 1. build
 2. send to device
 3. run test on a simple native app
+
+## usage
 
 
 ## /proc
@@ -239,9 +243,3 @@ the read on an 8-byte boundary (e.g., if you sought an odd number of bytes
 into the file), or if the size of the read is not a multiple of 8 bytes.
 
 
-
-
-
-## question
-
-- how to tell if a pages is in swap or not.

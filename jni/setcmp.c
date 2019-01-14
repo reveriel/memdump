@@ -87,13 +87,16 @@ void print_inter_simi(struct Process **proc, int num)
 
         int dup_page_nr = 0;
         struct Data *d = set_first(set[i]);
-        do {
+        do
+        {
             int found = 0;
 
-            for (int j = 0; j < num; j++) {
+            for (int j = 0; j < num; j++)
+            {
                 if (j == i)
                     continue;
-                if (set_in(set[j], d)) {
+                if (set_in(set[j], d))
+                {
                     found = 1;
                     break;
                 }
@@ -103,9 +106,36 @@ void print_inter_simi(struct Process **proc, int num)
         } while (d = set_next(d), d);
 
         // fprintf(stderr, "pid = %d, dup: %d %d\n", proc_get_pid(proc[i]),
-                // dup_page_nr, set_size(set[i]));
+        // dup_page_nr, set_size(set[i]));
 
-        fprintf(stderr, "%d %d\n", dup_page_nr, set_size(set[i]));
+        fprintf(stderr, "%d \n", dup_page_nr );
+    }
+
+    for (int i = 0; i < num; i++)
+        set_free(set[i]);
+}
+
+void print_simi_matrix(struct Process **proc, int num)
+{
+
+    struct Set *set[MAX_PID];
+    for (int i = 0; i < num; i++)
+        set[i] = set_from_proc(proc[i]);
+
+    for (int i = 0; i < num; i++)
+    {
+        for (int j = 0; j < num; j++)
+        {
+            if (i == j)
+            {
+                fprintf(stderr, "0 ");
+                continue;
+            }
+
+            fprintf(stderr, "%d ", set_common(set[i], set[j]));
+        }
+
+        fprintf(stderr, "\n");
     }
 
     for (int i = 0; i < num; i++)
@@ -123,29 +153,31 @@ int main(int argc, char const *argv[])
     int num_pid = argc - 1;
     int pid[MAX_PID];
     struct Process *proc[MAX_PID];
-    for (int i = 0; i < num_pid; i++) {
-        pid[i] = atoi(argv[i+1]);
+    for (int i = 0; i < num_pid; i++)
+    {
+        pid[i] = atoi(argv[i + 1]);
         proc[i] = proc_init(pid[i]);
     }
 
-    for (int i = 0; i < num_pid; i++) {
+    for (int i = 0; i < num_pid; i++)
+    {
         // fprintf(stderr, "%d\n", pid[i]);
         proc_attach(proc[i]);
         proc_do(proc[i]);
         proc_detach(proc[i]);
     }
 
-
-    // print_inter_simi(proc, num_pid);
+    print_inter_simi(proc, num_pid);
+    fprintf(stderr, "\n");
 
     print_intra_simi(proc, num_pid);
+    fprintf(stderr, "\n");
 
+    print_simi_matrix(proc, num_pid);
 
-
-    for (int i = 0; i < num_pid; i++) {
+    for (int i = 0; i < num_pid; i++)
+    {
         proc_del(proc[i]);
     }
     return 0;
 }
-
-

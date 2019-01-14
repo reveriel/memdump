@@ -29,6 +29,9 @@ int proc_attach(struct Process *p);
 // detach from 'p', process 'p' will resume.
 void proc_detach(struct Process *p);
 
+void proc_save(const char *filename);
+struct Process *proc_load(const char *filename);
+
 // return number of memory regions
 int proc_mr_num(struct Process *p);
 struct MemReg *proc_get_mr(struct Process *p, int index);

@@ -137,7 +137,8 @@ double set_jaccard(struct Set *a, struct Set *b)
     return (double)y / (double)(x + y + z);
 }
 
-// return size of a \cap b
+// return
+// how many elem in a can be found in b.
 int set_common(struct Set *a, struct Set *b)
 {
     int cnt = 0;

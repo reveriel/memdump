@@ -699,6 +699,16 @@ void proc_print_maps(struct Process *p)
     }
 }
 
+// save proc to a file
+void proc_save(const char *filename)
+{
+
+}
+
+struct Process *proc_load(const char *filename) {
+    return NULL;
+}
+
 static void mem_print_pages(struct MemReg *m)
 {
     int i = 0;
@@ -785,3 +795,6 @@ int page_is_zero(struct Page *p)
 {
     return p->hash == zero_page_hash;
 }
+
+
+
