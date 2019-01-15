@@ -15,7 +15,8 @@
 
 void set_add_mr(struct Set *s, struct MemReg *mr)
 {
-    for (int i = 0; i < mr_page_num(mr); i++) {
+    for (int i = 0; i < mr_page_num(mr); i++)
+    {
         struct Page *page = mr_get_page(mr, i);
         if (page_is_zero(page))
             continue;
@@ -61,7 +62,8 @@ struct Set *uniq_set_from_proc(struct Process *p)
 
 void print_intra_simi(struct Process **proc, int num)
 {
-    for (int i = 0; i < num; i++) {
+    for (int i = 0; i < num; i++)
+    {
         struct Set *set = set_from_proc(proc[i]);
         struct Set *uniq_set = uniq_set_from_proc(proc[i]);
 
@@ -70,6 +72,24 @@ void print_intra_simi(struct Process **proc, int num)
         set_free(set);
         set_free(uniq_set);
     }
+}
+
+// if found, return 1;
+// else return 0;
+int found_in_other_process(struct Set *set[], int num, struct Data *d, int this)
+{
+    int found = 0;
+    for (int i = 0; i < num; i++)
+    {
+        if (i == this)
+            continue;
+        if (set_in(set[i], d))
+        {
+            found = 1;
+            break;
+        }
+    }
+    return found;
 }
 
 // how many nonzero pages can be found in other proceses.
@@ -84,31 +104,17 @@ void print_inter_simi(struct Process **proc, int num)
     // inter process
     for (int i = 0; i < num; i++)
     {
-
         int dup_page_nr = 0;
         struct Data *d = set_first(set[i]);
         do
         {
-            int found = 0;
-
-            for (int j = 0; j < num; j++)
-            {
-                if (j == i)
-                    continue;
-                if (set_in(set[j], d))
-                {
-                    found = 1;
-                    break;
-                }
-            }
-
-            dup_page_nr += found;
+            dup_page_nr += found_in_other_process(set, num, d, i);
         } while (d = set_next(d), d);
 
         // fprintf(stderr, "pid = %d, dup: %d %d\n", proc_get_pid(proc[i]),
         // dup_page_nr, set_size(set[i]));
 
-        fprintf(stderr, "%d \n", dup_page_nr );
+        fprintf(stderr, "%d \n", dup_page_nr);
     }
 
     for (int i = 0; i < num; i++)
@@ -132,7 +138,7 @@ void print_simi_matrix(struct Process **proc, int num)
                 continue;
             }
 
-            fprintf(stderr, "%d ", set_common(set[i], set[j]));
+            fprintf(stderr, "%d ", set_found_in(set[i], set[j]));
         }
 
         fprintf(stderr, "\n");
@@ -140,6 +146,56 @@ void print_simi_matrix(struct Process **proc, int num)
 
     for (int i = 0; i < num; i++)
         set_free(set[i]);
+}
+
+// return mem region's dup number
+// i.e. how many pages in 'mr' can be found in other processes
+int mr_dup_inter(struct Set *set[], int num, struct MemReg *mr, int this)
+{
+    int dup = 0;
+    for (int i = 0; i < mr_page_num(mr); i++)
+    {
+        struct Page *page = mr_get_page(mr, i);
+        if (page_is_zero(page))
+            continue;
+        struct Data *d = data_init(page_to_u32(page));
+        dup += found_in_other_process(set, num, d, this);
+        data_free(d);
+    }
+    return dup;
+}
+
+// return number of nonzero pages in 'mr'
+int mr_nonzero_num(struct MemReg *mr)
+{
+    int n = 0;
+    for (int i = 0; i < mr_page_num(mr); i++)
+        if (!page_is_zero(mr_get_page(mr, i)))
+            n++;
+    return n;
+}
+
+// found which vma has more dup
+void print_inter_simi_vma(struct Process **proc, int num)
+{
+    struct Set *set[MAX_PID];
+
+    for (int i = 0; i < num; i++)
+        set[i] = set_from_proc(proc[i]);
+
+    // for each process
+    for (int i = 0; i < num; i++)
+    {
+        // for each mem region
+        for (int j = 0; j < proc_mr_num(proc[i]); j++)
+        {
+            struct MemReg *mr = proc_get_mr(proc[i], j);
+            int dup = mr_dup_inter(set, num, mr, i);
+
+            fprintf(stderr, "%d %d %s\n",
+                    dup, mr_nonzero_num(mr), mr_get_name(mr));
+        }
+    }
 }
 
 int main(int argc, char const *argv[])
@@ -167,13 +223,15 @@ int main(int argc, char const *argv[])
         proc_detach(proc[i]);
     }
 
-    print_inter_simi(proc, num_pid);
-    fprintf(stderr, "\n");
+    // print_inter_simi(proc, num_pid);
+    // fprintf(stderr, "\n");
 
-    print_intra_simi(proc, num_pid);
-    fprintf(stderr, "\n");
+    // print_intra_simi(proc, num_pid);
+    // fprintf(stderr, "\n");
 
-    print_simi_matrix(proc, num_pid);
+    // print_simi_matrix(proc, num_pid);
+
+    print_inter_simi_vma(proc, num_pid);
 
     for (int i = 0; i < num_pid; i++)
     {

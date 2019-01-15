@@ -12,7 +12,7 @@
 // redunency
 struct Redund
 {
-    int comm;
+    int dup;
     struct MemReg *m1;
     struct MemReg *m2;
 };
@@ -36,7 +36,7 @@ struct Set *build_set_from_mr(struct MemReg *m)
 
 int comp_redunds(const void *a, const void *b)
 {
-    return ((struct Redund *)a)->comm - ((struct Redund *)b)->comm;
+    return ((struct Redund *)a)->dup - ((struct Redund *)b)->dup;
 }
 
 void print_simi(struct Process *p1, struct Process *p2)
@@ -70,7 +70,7 @@ void print_simi(struct Process *p1, struct Process *p2)
         for (int j = 0; j < n2; j++)
         {
             struct Redund *r = &redunds[i * n2 + j];
-            r->comm = set_common(sets1[i], sets2[j]);
+            r->dup = set_found_in(sets1[i], sets2[j]);
             r->m1 = proc_get_mr(p1, i);
             r->m2 = proc_get_mr(p2, j);
             // double simi = simi_mrs(m1, m2);
@@ -83,9 +83,9 @@ void print_simi(struct Process *p1, struct Process *p2)
     for (int i = 0, total = n1 * n2; i < total; i++)
     {
         struct Redund *r = &redunds[i];
-        if (r->comm == 0)
+        if (r->dup == 0)
             continue;
-        fprintf(stderr, "%d/%d%s/%d%s %s %lx %s %lx\n", r->comm,
+        fprintf(stderr, "%d/%d%s/%d%s %s %lx %s %lx\n", r->dup,
                 mr_page_num(r->m1), mr_get_perm(r->m1),
                 mr_page_num(r->m2), mr_get_perm(r->m2),
                 mr_get_name(r->m1), mr_get_start(r->m1),

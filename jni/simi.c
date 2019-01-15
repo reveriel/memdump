@@ -139,7 +139,7 @@ double set_jaccard(struct Set *a, struct Set *b)
 
 // return
 // how many elem in a can be found in b.
-int set_common(struct Set *a, struct Set *b)
+int set_found_in(struct Set *a, struct Set *b)
 {
     int cnt = 0;
     for (struct rb_node *p = rb_first(&a->root); p; p = rb_next(p))

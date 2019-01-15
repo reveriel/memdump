@@ -312,7 +312,7 @@ void proc_del(struct Process *p)
         fclose(p->pMemFile);
     if (p->pagemap_fd != -1)
         close(p->pagemap_fd);
-    for (int i = 0; i < (int)p->maps_size; i++)
+    for (int i = 0; i < proc_mr_num(p); i++)
     {
         if (p->maps[i].pages)
             free(p->maps[i].pages);
@@ -372,7 +372,8 @@ static void parse_maps_line(char *line, struct MemReg *m, struct Process *p)
     }
     else
     {
-        sprintf(path, "[%d:%lx]", p->no_name_cnt++, m->start);
+        // sprintf(path, "[%d:%lx]", p->no_name_cnt++, m->start);
+        sprintf(path, "[%lx]", m->start);
         m->pathname = strdup(path);
     }
 }
@@ -389,31 +390,34 @@ char *mr_get_perm(struct MemReg *m)
 }
 
 // read all pages in.;
+// save pages' hash
 static void read_mem(struct Process *p)
 {
     uint8_t page[pageSize];
 
-    for (int i = 0; i < (int)p->maps_size; i++)
+    for (int i = 0; i < proc_mr_num(p); i++)
     {
         struct MemReg *m = proc_get_mr(p, i);
         size_t numPages = (m->end - m->start) / pageSize + 1;
         m->pages = (struct Page *)malloc(sizeof(struct Page) * numPages);
 
         fseeko(p->pMemFile, m->start, SEEK_SET);
-        int j = 0;
+        int idx = 0;
         for (unsigned long addr = m->start; addr < m->end; addr += pageSize)
         {
             int ret = fread(page, 1, pageSize, p->pMemFile);
             if (ret != pageSize)
             {
-                fprintf(stderr, "fread error\n");
-                perror(NULL);
+                perror("fread error at /proc/pid/mem/");
+                fprintf(stderr, "try again may solve the question\n");
                 continue;
             }
-            m->pages[j++].hash = page_hash(page, pageSize);
-            if (j == (int)numPages)
+
+            m->pages[idx++].hash = page_hash(page, pageSize);
+
+            if (idx == (int)numPages)
             {
-                fprintf(stderr, "pages size too small\n");
+                fprintf(stderr, "%s:pages size too small\n", __func__);
                 break;
             }
         }
@@ -439,7 +443,7 @@ static void parse_maps(struct Process *p, bool filter_anon, int minsize)
     {
         if (p->maps_cap == p->maps_size + 1)
         {
-            p->maps_cap *= 2;
+        p->maps_cap *= 2;
             p->maps = (struct MemReg *)realloc(p->maps, p->maps_cap * sizeof(struct MemReg));
         }
 
@@ -640,7 +644,7 @@ static void mr_parse_pagemap(struct MemReg *m, int fd)
 
 static void parse_pagemap(struct Process *p)
 {
-    for (int i = 0; i < (int)p->maps_size; i++)
+    for (int i = 0; i < proc_mr_num(p); i++)
     {
         proc_get_mr(p, i);
         struct MemReg *mr = proc_get_mr(p, i);
@@ -691,7 +695,7 @@ void proc_do(struct Process *p)
 void proc_print_maps(struct Process *p)
 {
     fprintf(stderr, "start     -     end  nr_page \t name\n");
-    for (int i = 0; i < (int)p->maps_size; i++)
+    for (int i = 0; i < proc_mr_num(p); i++)
     {
         struct MemReg *m = proc_get_mr(p, i);
         fprintf(stderr, "%08lx-%08lx %d \t %s\n",
@@ -720,7 +724,7 @@ static void mem_print_pages(struct MemReg *m)
 
 void proc_print_pages(struct Process *p)
 {
-    for (int i = 0; i < (int)p->maps_size; i++)
+    for (int i = 0; i < proc_mr_num(p); i++)
     {
         struct MemReg *m = proc_get_mr(p, i);
         fprintf(stderr, "%012lx-%012lx \t %s\n", m->start, m->end, m->pathname);
@@ -750,7 +754,7 @@ void proc_detach(struct Process *p)
 }
 
 // return number of memory regions
-int proc_mr_num(struct Process *p)
+inline int proc_mr_num(struct Process *p)
 {
     return p->maps_size;
 }

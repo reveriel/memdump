@@ -22,9 +22,11 @@ int set_size(struct Set *s);
 struct Data *set_first(struct Set *s);
 struct Data *set_next(struct Data *d);
 
-// return how many elements are in common
-// set_common({ a, b, b, c},  {b ,b } ) = 2
-int set_common(struct Set *a, struct Set *b);
+// return
+// how many elem in a can be found in b.
+// set_found_in({ a, b, b, c},  {b ,b } ) = 2
+// set_found_in({a,a,a,a}, {a}) = 4
+int set_found_in(struct Set *a, struct Set *b);
 /*
 how many element in a  are also in b ?
 */
