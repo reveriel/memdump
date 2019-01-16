@@ -29,6 +29,12 @@ int main()
 
     do_something(l_buf);
 
+    for (int i = 0; i < 10; i++) {
+        int pid = fork();
+        if (pid == 0)
+            break;
+    }
+
     for (int i = 0; i < 100; i++)
     {
         fprintf(stderr, "pid = %d, test native app is running\n", getpid());

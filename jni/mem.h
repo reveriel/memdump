@@ -17,6 +17,10 @@ void proc_del(struct Process *p);
 // then read each page in /proc/<pid>/mem
 // require proc_attach() is called.
 void proc_do(struct Process *p);
+
+// use this after calling 'proc_do()'
+void proc_parse_pagemap(struct Process *p);
+
 void proc_print_maps(struct Process *p);
 void proc_print_pages(struct Process *p);
 int proc_get_pid(struct Process *p);

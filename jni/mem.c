@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include <string.h>
 #include <stdbool.h>
 #include <limits.h>
@@ -21,8 +22,8 @@
 
 bool zero_page_hash_ready = false;
 uint32_t zero_page_hash = 0;
-bool kpageflags_fd_ready = false;
 int kpageflags_fd = -1;
+int kpagecount_fd = -1;
 // not closed.. sorry
 
 struct Timer {
@@ -211,6 +212,17 @@ const size_t pageSize = 4096;
     type __max2 = (y);          \
     __max1 > __max2 ? __max1 : __max2; })
 
+static void fatal(const char *x, ...)
+{
+	va_list ap;
+
+	va_start(ap, x);
+	vfprintf(stderr, x, ap);
+	va_end(ap);
+	exit(EXIT_FAILURE);
+}
+
+
 // https://en.wikipedia.org/wiki/Jenkins_hash_function
 static uint32_t page_hash(uint8_t *page, size_t length)
 {
@@ -279,20 +291,12 @@ static void init_zero_page_hash()
     zero_page_hash_ready = true;
 }
 
-static void init_kpageflags_fd()
-{
-    kpageflags_fd = checked_open("/proc/kpageflags", O_RDONLY);
-    kpageflags_fd_ready = true;
-}
 
 // return NULL if failed
 struct Process *proc_init(int pid)
 {
     if (!zero_page_hash_ready)
         init_zero_page_hash();
-
-    if (!kpageflags_fd_ready)
-        init_kpageflags_fd();
 
     struct Process *p = (struct Process *)malloc(sizeof(struct Process));
     p->pid = pid;
@@ -324,8 +328,8 @@ void proc_del(struct Process *p)
 }
 
 // 'line' is one line from /proc/<pid>/maps
-// parse 'line', save it to 'm'
-static void parse_maps_line(char *line, struct MemReg *m, struct Process *p)
+// parse 'line', save it to 'mr'
+static void parse_maps_line(char *line, struct MemReg *mr)
 {
     unsigned long start_address;
     unsigned long end_address;
@@ -360,33 +364,33 @@ static void parse_maps_line(char *line, struct MemReg *m, struct Process *p)
         return;
     }
 
-    m->start = start_address;
-    m->end = end_address;
-    m->r = r;
-    m->w = w;
-    m->x = x;
-    m->s = s;
+    mr->start = start_address;
+    mr->end = end_address;
+    mr->r = r;
+    mr->w = w;
+    mr->x = x;
+    mr->s = s;
     // some vma doesn't have a nome, make one for it.
     if (strlen(path) != 0)
     {
-        m->pathname = strdup(path);
+        mr->pathname = strdup(path);
     }
     else
     {
-        // sprintf(path, "[%d:%lx]", p->no_name_cnt++, m->start);
-        sprintf(path, "[0x%lx]", m->start);
-        m->pathname = strdup(path);
+        // sprintf(path, "[%d:%lx]", p->no_name_cnt++, mr->start);
+        sprintf(path, "[0x%lx]", mr->start);
+        mr->pathname = strdup(path);
     }
 }
 
 // return mr's permision string "rwxs"
-char *mr_get_perm(struct MemReg *m)
+char *mr_get_perm(struct MemReg *mr)
 {
     static char str[5];
-    str[0] = m->r;
-    str[1] = m->w;
-    str[2] = m->x;
-    str[3] = m->s;
+    str[0] = mr->r;
+    str[1] = mr->w;
+    str[2] = mr->x;
+    str[3] = mr->s;
     return str;
 }
 
@@ -398,13 +402,13 @@ static void read_mem(struct Process *p)
 
     for (int i = 0; i < proc_mr_num(p); i++)
     {
-        struct MemReg *m = proc_get_mr(p, i);
-        size_t numPages = (m->end - m->start) / pageSize + 1;
-        m->pages = (struct Page *)malloc(sizeof(struct Page) * numPages);
+        struct MemReg *mr = proc_get_mr(p, i);
+        size_t numPages = (mr->end - mr->start) / pageSize + 1;
+        mr->pages = (struct Page *)malloc(sizeof(struct Page) * numPages);
 
-        fseeko(p->pMemFile, m->start, SEEK_SET);
+        fseeko(p->pMemFile, mr->start, SEEK_SET);
         int idx = 0;
-        for (unsigned long addr = m->start; addr < m->end; addr += pageSize)
+        for (unsigned long addr = mr->start; addr < mr->end; addr += pageSize)
         {
             int ret = fread(page, 1, pageSize, p->pMemFile);
             if (ret != pageSize)
@@ -414,7 +418,7 @@ static void read_mem(struct Process *p)
                 continue;
             }
 
-            m->pages[idx++].hash = page_hash(page, pageSize);
+            mr->pages[idx++].hash = page_hash(page, pageSize);
 
             if (idx == (int)numPages)
             {
@@ -425,15 +429,16 @@ static void read_mem(struct Process *p)
     }
 }
 
-inline bool mr_is_anon(struct MemReg *m)
+inline bool mr_is_anon(struct MemReg *mr)
 {
-    return !m->pathname || m->pathname[0] == '[';
+    return !mr->pathname || mr->pathname[0] == '[';
 }
 
 // if 'filter_anon, only save anonymous memory region
 // memory region size(number of pages) <= 'minsize' will be ignored
 static void parse_maps(struct Process *p, bool filter_anon, int minsize)
 {
+
     // p->maps is a dynamicly allocated array, size double if full.
     p->maps_size = 0;
     p->maps_cap = 4;
@@ -450,7 +455,7 @@ static void parse_maps(struct Process *p, bool filter_anon, int minsize)
 
         struct MemReg *mr = proc_get_mr(p, p->maps_size);
 
-        parse_maps_line(line, mr, p);
+        parse_maps_line(line, mr);
         if (filter_anon && !mr_is_anon(mr))
             continue;
         if (mr_page_num(mr) <= minsize)
@@ -518,13 +523,14 @@ static unsigned long pagemap_read(int fd, uint64_t *buf,
 static unsigned long kpageflags_read(uint64_t *buf,
                                      unsigned long index, unsigned long pages)
 {
-    if (!kpageflags_fd_ready)
-    {
-        fprintf(stderr, "kpageflags not opened\n");
-        exit(EXIT_FAILURE);
-    }
-
     return do_u64_read(kpageflags_fd, "/proc/kpageflags", buf, index, pages);
+}
+
+static unsigned long kpagecount_read(uint64_t *buf,
+                                     unsigned long index,
+                                     unsigned long pages)
+{
+    return kpagecount_fd < 0 ? pages : do_u64_read(kpagecount_fd, "/proc/kpagecount", buf, index, pages);
 }
 
 static unsigned long pagemap_swap_offset(uint64_t val)
@@ -545,9 +551,9 @@ static unsigned long pagemap_pfn(uint64_t val)
 }
 
 static void show_page(unsigned long voffset, unsigned long offset,
-                      uint64_t flags)
+                      uint64_t flags, uint64_t cnt)
 {
-    // fprintf(stderr, "%lx %lx \t%s\n", voffset, offset, page_flag_name(flags));
+    fprintf(stderr, "%ld %lx %lx \t%s\n", (int64_t)cnt, voffset, offset, page_flag_name(flags));
 }
 
 static uint64_t kpageflags_flags(uint64_t flags, uint64_t pme)
@@ -579,18 +585,21 @@ static uint64_t kpageflags_flags(uint64_t flags, uint64_t pme)
     return flags;
 }
 
-static void add_page(unsigned long voffset, unsigned long offset,
-                     uint64_t flags, uint64_t pme)
+static void print_page_flags_cnt(unsigned long voffset, unsigned long offset,
+                     uint64_t flags, uint64_t cnt, uint64_t pme)
 {
     flags = kpageflags_flags(flags, pme);
-    show_page(voffset, offset, flags);
+    show_page(voffset, offset, flags, cnt);
 }
+
 
 #define KPAGEFLAGS_BATCH (64 << 10)
 static void walk_pfn(unsigned long voffset, unsigned long index,
-                     unsigned long count, uint64_t pme)
+                     unsigned long count, uint64_t pme,
+                     struct MemReg *mr)
 {
     uint64_t buf[KPAGEFLAGS_BATCH];
+    uint64_t cnt[KPAGEFLAGS_BATCH];
 
     while (count)
     {
@@ -599,10 +608,16 @@ static void walk_pfn(unsigned long voffset, unsigned long index,
         if (pages == 0)
             break;
 
+        if (kpagecount_read(cnt, index, pages) != pages)
+            fatal("kpagecount returned fewer pages than expected");
+
         for (unsigned long i = 0; i < pages; i++)
         {
-            add_page(voffset + i, index + i, buf[i], pme);
+            if (cnt[i] == 0)
+                continue;
+            print_page_flags_cnt(voffset + i, index + i, buf[i], cnt[i], pme);
         }
+
         index += pages;
         count -= pages;
     }
@@ -611,17 +626,17 @@ static void walk_pfn(unsigned long voffset, unsigned long index,
 static void walk_swap(unsigned long voffset, uint64_t pme)
 {
     uint64_t flags = kpageflags_flags(0, pme);
-    show_page(voffset, pagemap_swap_offset(pme), flags);
+    show_page(voffset, pagemap_swap_offset(pme), flags, -1);
 }
 
 #define PAGEMAP_BATCH (64 << 8)
-static void mr_parse_pagemap(struct MemReg *m, int fd)
+static void mr_parse_pagemap(struct MemReg *mr, int fd)
 {
-    fprintf(stderr, "parse pagemap : %lx-%lx %s\n", m->start, m->end, m->pathname);
+    fprintf(stderr, "parse pagemap : %lx-%lx %s\n", mr->start, mr->end, mr->pathname);
     uint64_t buf[PAGEMAP_BATCH];
-    // size of mr in bytes
-    unsigned long count = (m->end - m->start) / pageSize;
-    unsigned long index = m->start / pageSize;
+
+    unsigned long count = (mr->end - mr->start) / pageSize;
+    unsigned long index = mr->start / pageSize;
     while (count)
     {
         // how many entry will we read.
@@ -634,7 +649,7 @@ static void mr_parse_pagemap(struct MemReg *m, int fd)
         {
             unsigned long pfn = pagemap_pfn(buf[i]);
             if (pfn)
-                walk_pfn(index + i, pfn, 1, buf[i]);
+                walk_pfn(index + i, pfn, 1, buf[i], mr); // I know it's not beautiful
             if (buf[i] & PM_SWAP)
                 walk_swap(index + i, buf[i]);
         }
@@ -643,14 +658,20 @@ static void mr_parse_pagemap(struct MemReg *m, int fd)
     }
 }
 
-static void parse_pagemap(struct Process *p)
+void proc_parse_pagemap(struct Process *p)
 {
+    kpageflags_fd = checked_open("/proc/kpageflags", O_RDONLY);
+    kpagecount_fd = checked_open("/proc/kpagecount", O_RDONLY);
+
     for (int i = 0; i < proc_mr_num(p); i++)
     {
         proc_get_mr(p, i);
         struct MemReg *mr = proc_get_mr(p, i);
         mr_parse_pagemap(mr, p->pagemap_fd);
     }
+
+    close(kpagecount_fd);
+    close(kpagecount_fd);
 }
 
 void mem_time_report()
@@ -699,28 +720,30 @@ void proc_print_maps(struct Process *p)
     fprintf(stderr, "start     -     end  nr_page \t name\n");
     for (int i = 0; i < proc_mr_num(p); i++)
     {
-        struct MemReg *m = proc_get_mr(p, i);
+        struct MemReg *mr = proc_get_mr(p, i);
         fprintf(stderr, "%08lx-%08lx %d \t %s\n",
-                m->start, m->end, mr_page_num(m), m->pathname);
+                mr->start, mr->end, mr_page_num(mr), mr->pathname);
     }
 }
 
+#define UNUSED(x) ((x) = (x))
 // save proc to a file
 void proc_save(const char *filename)
 {
-
+    UNUSED(filename);
 }
 
 struct Process *proc_load(const char *filename) {
+    UNUSED(filename);
     return NULL;
 }
 
-static void mem_print_pages(struct MemReg *m)
+static void mem_print_pages(struct MemReg *mr)
 {
     int i = 0;
-    for (unsigned long addr = m->start; addr < m->end; addr += pageSize)
+    for (unsigned long addr = mr->start; addr < mr->end; addr += pageSize)
     {
-        fprintf(stderr, "  %012lx: %08x\n", addr, m->pages[i++].hash);
+        fprintf(stderr, "  %012lx: %08x\n", addr, mr->pages[i++].hash);
     }
 }
 
@@ -728,9 +751,9 @@ void proc_print_pages(struct Process *p)
 {
     for (int i = 0; i < proc_mr_num(p); i++)
     {
-        struct MemReg *m = proc_get_mr(p, i);
-        fprintf(stderr, "%012lx-%012lx \t %s\n", m->start, m->end, m->pathname);
-        mem_print_pages(m);
+        struct MemReg *mr = proc_get_mr(p, i);
+        fprintf(stderr, "%012lx-%012lx \t %s\n", mr->start, mr->end, mr->pathname);
+        mem_print_pages(mr);
     }
 }
 
@@ -772,24 +795,24 @@ inline int proc_get_pid(struct Process *p)
 }
 
 // return number of pages in mr
-int mr_page_num(struct MemReg *m)
+int mr_page_num(struct MemReg *mr)
 {
-    return (m->end - m->start) / pageSize;
+    return (mr->end - mr->start) / pageSize;
 }
 
-struct Page *mr_get_page(struct MemReg *m, int index)
+struct Page *mr_get_page(struct MemReg *mr, int index)
 {
-    return &m->pages[index];
+    return &mr->pages[index];
 }
 
-const char *mr_get_name(struct MemReg *m)
+const char *mr_get_name(struct MemReg *mr)
 {
-    return m->pathname;
+    return mr->pathname;
 }
 
-unsigned long mr_get_start(struct MemReg *m)
+unsigned long mr_get_start(struct MemReg *mr)
 {
-    return m->start;
+    return mr->start;
 }
 
 uint32_t page_to_u32(struct Page *p)
