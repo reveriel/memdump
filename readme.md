@@ -1,7 +1,7 @@
 # memdump
 
 adapted from [memdump](https://security.stackexchange.com/questions/62300/memory-dumping-android/109068#109068
-)
+) and    [linux/tools/vm/page-types.c](https://github.com/torvalds/linux/blob/master/tools/vm/page-types.c)
 
 ## build
 
@@ -71,7 +71,6 @@ address           perms offset  dev   inode   pathname
 - offset: offset into the file or whatever.
 - device: device(major:minor)
   -    /dev/block/zram0 是多少? 这个能看出来吗?
-  - mate20 中, 有些 minor 读出来是 2d, 不是个数字..
 - inode - If the region was mapped from a file, this is the file number., the
   inode on that device. 0 indicates that no inode is associated with the memory
   region, like BSS.
