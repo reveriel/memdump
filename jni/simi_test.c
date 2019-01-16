@@ -23,7 +23,7 @@ static void _test(int *d_a, int a_size, int *d_b, int b_size)
     set_print(b);
 
     printf(" a b simi  = %lf  \n", set_jaccard(a, b));
-    printf(" a b comm  = %d  \n", set_common(a, b));
+    printf(" a b comm  = %d  \n", set_found_in(a, b));
 
     set_free(a);
     set_free(b);

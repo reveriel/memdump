@@ -39,6 +39,6 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := testnapp
 LOCAL_SRC_FILES := testnapp.c
 LOCAL_CPPFLAGS := -std=gnu++0x -Wall -fPIE         # whatever g++ flags you like
-LOCAL_CFLAGS :=  -Wall -W
+LOCAL_CFLAGS :=  -Wall -W -O0
 # LOCAL_LDLIBS := -L$(SYSROOT)/usr/lib -llog -fPIE -pie   # whatever ld flags you like
 include $(BUILD_EXECUTABLE)    # <-- Use this to build an executable.

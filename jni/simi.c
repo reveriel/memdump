@@ -93,14 +93,14 @@ void set_free(struct Set *s)
 void set_print(struct Set *s)
 {
     struct rb_root *root = &s->root;
-    printf("{ ");
+    fprintf(stderr, "{ ");
     for (struct rb_node *p = rb_first(root); p; p = rb_next(p))
     {
         struct Data *data = rb_entry(p, struct Data, node);
         data_print(data);
-        printf(" ");
+        fprintf(stderr, " ");
     }
-    printf(" }\n");
+    fprintf(stderr, " }\n");
 }
 
 /*
@@ -158,15 +158,22 @@ struct Data *set_first(struct Set *s)
 
 struct Data *set_next(struct Data *d)
 {
+    if (!d)
+        return NULL;
     struct rb_node *n = rb_next(&d->node);
     if (!n)
         return NULL;
-    return rb_entry(rb_next(&d->node), struct Data, node);
+    return rb_entry(n, struct Data, node);
 }
 
 struct Data *data_init(uint32_t v)
 {
     struct Data *d = (struct Data *)malloc(sizeof(struct Data));
+    if (!d) {
+        fprintf(stderr, "%s:alloc error\n", __func__);
+        perror(0);
+        exit(-1);
+    }
     d->v = v;
     return d;
 }
@@ -178,6 +185,6 @@ void data_free(struct Data *d)
 
 void data_print(struct Data *d)
 {
-    printf("%u", d->v);
+    fprintf(stderr, "%u", d->v);
 }
 

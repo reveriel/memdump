@@ -31,12 +31,13 @@ void maps_stat(int pid)
     for (int i = 0; i < proc_mr_num(p); i++)
     {
         struct MemReg *mr = proc_get_mr(p, i);
-        if (mr_is_anon(mr)) {
+        if (mr_is_anon(mr))
+        {
             nr_anon++;
-            fprintf(stderr, "%d %s\n", mr_page_num(mr), mr_get_name(mr));
+            // fprintf(stderr, "%d %s\n", mr_page_num(mr), mr_get_name(mr));
         }
     }
-    fprintf(stderr, "%d/%d\n", nr_anon, proc_mr_num(p));
+    fprintf(stderr, "%d %d\n", nr_anon, proc_mr_num(p));
 }
 
 void nonzero_stat(int pid)
@@ -93,7 +94,7 @@ int main(int argc, char **argv)
     proc_detach(p);
 
     proc_print_maps(p);
-    // proc_print_pages(p);
+    proc_print_pages(p);
 
     // similarity of each pair of memory region
     // given two process ...

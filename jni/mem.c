@@ -194,6 +194,7 @@ struct MemReg
 struct Page
 {
     uint32_t hash;
+    int share; // how many pte are refering to this page;
 };
 
 const size_t pageSize = 4096;
@@ -373,7 +374,7 @@ static void parse_maps_line(char *line, struct MemReg *m, struct Process *p)
     else
     {
         // sprintf(path, "[%d:%lx]", p->no_name_cnt++, m->start);
-        sprintf(path, "[%lx]", m->start);
+        sprintf(path, "[0x%lx]", m->start);
         m->pathname = strdup(path);
     }
 }
@@ -691,6 +692,7 @@ void proc_do(struct Process *p)
                     // more than 90%
     time_end();
 }
+
 
 void proc_print_maps(struct Process *p)
 {
