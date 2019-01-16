@@ -3,24 +3,27 @@
 adapted from [memdump](https://security.stackexchange.com/questions/62300/memory-dumping-android/109068#109068
 )
 
-? 用 Python 做数据分析不轻松多了吗???? 啊啊啊啊啊
-
 ## build
 
-```
+you need [android ndk](https://developer.android.com/ndk/downloads/index)
+to compile it.
+
+``` shell
 ndk-build
 ```
 
-see file `jni/Android.mk`
+see makefile :`jni/Android.mk`,  `jni/Application.mk` and ndk's documents.
 
-## test
+## use
 
-1. build
-2. send to device
-3. run test on a simple native app
+after compile, executable will be in `./libs/arm64-v8a/`
+copy the executable to device, run it.
 
-## usage
+see test scripts.
 
+## design
+
+read a process's vma, memory pages and page table from procfs.
 
 ## /proc
 
