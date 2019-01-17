@@ -95,7 +95,7 @@ int main(int argc, char **argv)
     proc_detach(p);
 
     // proc_print_maps(p);
-    // proc_print_pages(p);
+    proc_print_pages(p);
 
     // similarity of each pair of memory region
     // given two process ...

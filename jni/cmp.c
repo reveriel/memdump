@@ -25,10 +25,15 @@ struct Set *build_set_from_mr(struct MemReg *m)
     int n = mr_page_num(m);
     for (int i = 0; i < n; i++)
     {
-        // filter zero page  ?
+        // filter zero page  ? yes
         struct Page *page = mr_get_page(m, i);
         if (page_is_zero(page))
             continue;
+
+        // filter page count == 1
+        if (page_count(page) > 1)
+            continue;
+
         set_add(s, data_init(page_to_u32(page)));
     }
     return s;
@@ -85,9 +90,9 @@ void print_simi(struct Process *p1, struct Process *p2)
         struct Redund *r = &redunds[i];
         if (r->dup == 0)
             continue;
-        fprintf(stderr, "%d/%d%s/%d%s %s %lx %s %lx\n", r->dup,
-                mr_page_num(r->m1), mr_get_perm(r->m1),
-                mr_page_num(r->m2), mr_get_perm(r->m2),
+        fprintf(stderr, "%d/%d/%d %s %lx %s %lx\n", r->dup,
+                mr_page_num(r->m1),
+                mr_page_num(r->m2),
                 mr_get_name(r->m1), mr_get_start(r->m1),
                 mr_get_name(r->m2), mr_get_start(r->m2));
     }
@@ -125,6 +130,8 @@ int main(int argc, char const *argv[])
 
     proc_do(p1);
     proc_do(p2);
+    proc_parse_pagemap(p1);
+    proc_parse_pagemap(p2);
 
     fprintf(stderr, "pid1 = %d, pid2 = %d\n", pid1, pid2);
     print_simi(p1, p2);

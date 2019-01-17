@@ -613,9 +613,16 @@ static void walk_pfn(unsigned long voffset, unsigned long index,
 
         for (unsigned long i = 0; i < pages; i++)
         {
-            if (cnt[i] == 0)
-                continue;
-            print_page_flags_cnt(voffset + i, index + i, buf[i], cnt[i], pme);
+            // if (cnt[i] == 0)
+            //     continue;
+
+            // print_page_flags_cnt(voffset + i, index + i, buf[i], cnt[i], pme);
+
+            // I need to feed the count data to 'mr'
+            unsigned long vaddr = (voffset + i) * pageSize;
+            // offset in mr->pages
+            unsigned long page_off = (vaddr - mr->start) / pageSize;
+            mr->pages[page_off].share = cnt[i];
         }
 
         index += pages;
@@ -632,7 +639,7 @@ static void walk_swap(unsigned long voffset, uint64_t pme)
 #define PAGEMAP_BATCH (64 << 8)
 static void mr_parse_pagemap(struct MemReg *mr, int fd)
 {
-    fprintf(stderr, "parse pagemap : %lx-%lx %s\n", mr->start, mr->end, mr->pathname);
+    // fprintf(stderr, "parse pagemap : %lx-%lx %s\n", mr->start, mr->end, mr->pathname);
     uint64_t buf[PAGEMAP_BATCH];
 
     unsigned long count = (mr->end - mr->start) / pageSize;
@@ -743,7 +750,15 @@ static void mem_print_pages(struct MemReg *mr)
     int i = 0;
     for (unsigned long addr = mr->start; addr < mr->end; addr += pageSize)
     {
-        fprintf(stderr, "  %012lx: %08x\n", addr, mr->pages[i++].hash);
+        if (mr->pages[i].share == 0)
+        {
+            i++;
+            continue;
+        }
+
+        fprintf(stderr, "%d  %012lx: %08x\n",
+                mr->pages[i].share, addr, mr->pages[i].hash);
+        i++;
     }
 }
 
@@ -823,6 +838,11 @@ uint32_t page_to_u32(struct Page *p)
 int page_is_zero(struct Page *p)
 {
     return p->hash == zero_page_hash;
+}
+
+int page_count(struct Page *p)
+{
+    return p->share;
 }
 
 

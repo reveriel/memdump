@@ -47,10 +47,9 @@ unsigned long mr_get_start(struct MemReg *m);
 char *mr_get_perm(struct MemReg *m);
 bool mr_is_anon(struct MemReg *m);
 
-
 uint32_t page_to_u32(struct Page *p);
 int page_is_zero(struct Page *p);
-
+int page_count(struct Page *p);
 
 void mem_time_report();
 

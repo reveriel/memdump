@@ -25,6 +25,19 @@ void set_add_mr(struct Set *s, struct MemReg *mr)
     }
 }
 
+void cand_set_add_mr(struct Set *s, struct MemReg *mr)
+{
+    for (int i = 0; i < mr_page_num(mr); i++)
+    {
+        struct Page *page = mr_get_page(mr, i);
+        if (page_is_zero(page))
+            continue;
+        if (page_count(page) > 1)
+            continue;
+        set_add(s, data_init(page_to_u32(page)));
+    }
+}
+
 // build a set using all nonzero pages from 'mr'
 struct Set *set_from_mr(struct MemReg *mr)
 {
@@ -41,6 +54,10 @@ struct Set *uniq_set_from_mr(struct MemReg *mr)
         struct Page *page = mr_get_page(mr, i);
         if (page_is_zero(page))
             continue;
+
+        if (page_count(page) > 1)
+            continue;
+
         struct Data *d = data_init(page_to_u32(page));
         if (set_in(s, d))
         {
@@ -64,6 +81,19 @@ struct Set *set_from_proc(struct Process *p)
     return s;
 }
 
+// cand_set will ignore page which count > 1
+struct Set *cand_set_from_proc(struct Process *p)
+{
+    struct Set *s = set_init();
+
+    for (int i = 0; i < proc_mr_num(p); i++)
+    {
+        struct MemReg *mr = proc_get_mr(p, i);
+        cand_set_add_mr(s, mr);
+    }
+    return s;
+}
+
 // the set created will have no duplicated elements
 struct Set *uniq_set_from_proc(struct Process *p)
 {
@@ -76,6 +106,10 @@ struct Set *uniq_set_from_proc(struct Process *p)
             struct Page *page = mr_get_page(mr, j);
             if (page_is_zero(page))
                 continue;
+
+            if (page_count(page) > 1)
+                continue;
+
             struct Data *d = data_init(page_to_u32(page));
             if (set_in(s, d))
             {
@@ -132,14 +166,21 @@ void print_inter_simi(struct Process **proc, int num)
         set[i] = set_from_proc(proc[i]);
 
     // inter process
+    // for each process
     for (int i = 0; i < num; i++)
     {
         int dup_page_nr = 0;
-        struct Data *d = set_first(set[i]);
-        do
-        {
-            dup_page_nr += found_in_other_sets(set, num, d, i);
-        } while (d = set_next(d), d);
+        for (int j = 0; j < proc_mr_num(proc[i]); j++){
+            struct MemReg *mr = proc_get_mr(proc[i], j);
+            for (int k = 0; k < mr_page_num(mr); k++) {
+                struct Page *p = mr_get_page(mr, k);
+                if (page_is_zero(p) || page_count(p) > 1)
+                    continue;
+                struct Data *d = data_init(page_to_u32(p));
+                dup_page_nr += found_in_other_sets(set, num, d, i);
+                data_free(d);
+            }
+        }
 
         // fprintf(stderr, "pid = %d, dup: %d %d\n", proc_get_pid(proc[i]),
         // dup_page_nr, set_size(set[i]));
@@ -155,8 +196,13 @@ void print_simi_matrix(struct Process **proc, int num)
 {
     fprintf(stderr, "simi matrix\n");
     struct Set *set[MAX_PID];
+
+    struct Set *cand_set[MAX_PID];
     for (int i = 0; i < num; i++)
         set[i] = set_from_proc(proc[i]);
+
+    for (int i = 0; i < num; i++)
+        cand_set[i] = cand_set_from_proc(proc[i]);
 
     for (int i = 0; i < num; i++)
     {
@@ -168,14 +214,17 @@ void print_simi_matrix(struct Process **proc, int num)
                 continue;
             }
 
-            fprintf(stderr, "%d ", set_found_in(set[i], set[j]));
+            fprintf(stderr, "%d ", set_found_in(cand_set[i], set[j]));
         }
 
         fprintf(stderr, "\n");
     }
 
     for (int i = 0; i < num; i++)
+    {
         set_free(set[i]);
+        set_free(cand_set[i]);
+    }
 }
 
 // return mem region's dup number
@@ -230,6 +279,7 @@ void print_inter_simi_mr(struct Process **proc, int num)
         }
     }
 }
+
 void print_total_dup(struct Process **proc, int num)
 {
     fprintf(stderr, "total dup\n");
@@ -252,7 +302,7 @@ void print_total_dup(struct Process **proc, int num)
         } while (d = set_next(d), d);
 
         fprintf(stderr, "%d %d \n",
-                dup_page_nr + set_size(set[i]) - set_size(uniq_set[i]),
+                dup_page_nr,
                 set_size(set[i]));
     }
 }
@@ -347,18 +397,19 @@ int main(int argc, char const *argv[])
         // fprintf(stderr, "%d\n", pid[i]);
         proc_attach(proc[i]);
         proc_do(proc[i]);
+        proc_parse_pagemap(proc[i]);
         proc_detach(proc[i]);
     }
 
-    // print_intra_simi(proc, num_pid); fprintf(stderr, "\n");
-    // print_inter_simi(proc, num_pid); fprintf(stderr, "\n");
-    // print_total_dup(proc, num_pid); fprintf(stderr, "\n");
+    print_intra_simi(proc, num_pid); fprintf(stderr, "\n");
+    print_inter_simi(proc, num_pid); fprintf(stderr, "\n");
+    print_total_dup(proc, num_pid); fprintf(stderr, "\n");
 
     // print_simi_matrix(proc, num_pid); fprintf(stderr, "\n");
 
     // print_inter_simi_mr(proc, num_pid); fprintf(stderr, "\n");
 
-    print_intra_process_simi_mr(proc, num_pid);
+    // print_intra_process_simi_mr(proc, num_pid);
 
 
     for (int i = 0; i < num_pid; i++)
